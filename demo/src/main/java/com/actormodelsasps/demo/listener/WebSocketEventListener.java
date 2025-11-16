@@ -1,6 +1,6 @@
 package com.actormodelsasps.demo.listener;
 
-import com.actormodelsasps.demo.service.PrivateMessageService;
+import com.actormodelsasps.demo.service.TeamMessageService;
 import com.actormodelsasps.demo.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
@@ -13,12 +13,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * WebSocketEventListener - Handles WebSocket connection lifecycle events for private messaging
+ * WebSocketEventListener - Handles WebSocket connection lifecycle events for team messaging
  * 
  * THREAD-BASED BEHAVIOR:
  * - These event handlers run on threads from the thread pool
  * - Can be called concurrently when multiple clients connect/disconnect
- * - Manages user online status and private messaging sessions
+ * - Manages user online status and team messaging sessions
  * 
  * Events:
  * 1. SessionConnectedEvent  - When WebSocket handshake completes
@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class WebSocketEventListener {
     
     @Autowired
-    private PrivateMessageService privateMessageService;
+    private TeamMessageService teamMessageService;
     
     @Autowired
     private UserService userService;
@@ -84,8 +84,8 @@ public class WebSocketEventListener {
             // Remove from session mapping
             sessionToUsername.remove(sessionId);
             
-            // Remove user session from private messaging service
-            privateMessageService.removeUserSession(username);
+            // Remove user session from team messaging service
+            teamMessageService.removeUserSession(username);
             
             // Set user as offline in database
             userService.setUserOnline(username, false);
@@ -93,7 +93,7 @@ public class WebSocketEventListener {
             System.out.println("   User set offline: ✅");
             
             // Get current active users for debugging
-            System.out.println("   Active users: " + privateMessageService.getActiveUsers().size());
+            System.out.println("   Active users: " + teamMessageService.getOnlineUsers().size());
         } else {
             System.out.println("   User not found (session may not have been registered)");
         }

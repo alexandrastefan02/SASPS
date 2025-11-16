@@ -1,8 +1,6 @@
 package com.actormodelsasps.demo.controller;
 
-import com.actormodelsasps.demo.model.Contact;
 import com.actormodelsasps.demo.model.User;
-import com.actormodelsasps.demo.service.ContactService;
 import com.actormodelsasps.demo.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -22,9 +20,6 @@ public class AuthController {
     
     @Autowired
     private UserService userService;
-    
-    @Autowired
-    private ContactService contactService;
     
     /**
      * Register a new user
@@ -110,20 +105,6 @@ public class AuthController {
             
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", "Logout failed"));
-        }
-    }
-    
-    /**
-     * Get user's contacts
-     */
-    @GetMapping("/contacts/{username}")
-    public ResponseEntity<?> getContacts(@PathVariable String username) {
-        try {
-            List<Contact> contacts = contactService.getContactsForUser(username);
-            return ResponseEntity.ok(Map.of("contacts", contacts));
-            
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to retrieve contacts"));
         }
     }
     

@@ -1,48 +1,75 @@
 package com.actormodelsasps.demo.model;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * Message model representing a chat message
+ * Message entity representing a chat message in a team
  * 
- * This class will be:
- * - Serialized to JSON when sent over WebSocket
- * - Deserialized from JSON when received
- * - Stored in message history (thread-safe collection)
+ * Messages are persisted in the database so they can be:
+ * - Delivered to offline users when they come online
+ * - Retrieved as conversation history
+ * - Stored permanently
  */
+@Entity
+@Table(name = "messages")
 public class Message {
     
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;           // The actual message text
+    
+    @Column(nullable = false)
     private String sender;            // Username of who sent it
-    private String recipient;         // Username of who should receive it (for 1-to-1)
+    
+    @Column(name = "team_id", nullable = false)
+    private Long teamId;              // Which team this message belongs to
+    
+    @Column(nullable = false)
     private LocalDateTime timestamp;   // When it was sent
-    private MessageType type;          // Type of message (PRIVATE, JOIN, LEAVE, etc.)
-    private String conversationId;     // Unique identifier for the conversation
+    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MessageType type;          // Type of message
+    
+    @Column(name = "is_delivered")
+    private boolean delivered = false; // Has this been delivered to all recipients?
     
     /**
      * Message types for different events
      */
     public enum MessageType {
-        PRIVATE,    // Private 1-to-1 message
-        JOIN,       // User joined notification
-        LEAVE,      // User left notification
-        TYPING,     // Typing indicator
-        DELIVERY_RECEIPT  // Message delivery confirmation
+        CHAT,       // Regular chat message
+        JOIN,       // User joined team notification
+        LEAVE,      // User left team notification
+        SYSTEM      // System message
     }
     
-    // Default constructor (required for JSON deserialization)
+    // Default constructor (required for JPA)
     public Message() {
-    }
-    
-    // Constructor with parameters
-    public Message(String content, String sender, MessageType type) {
-        this.content = content;
-        this.sender = sender;
-        this.type = type;
         this.timestamp = LocalDateTime.now();
     }
     
+    // Constructor with parameters
+    public Message(String content, String sender, Long teamId, MessageType type) {
+        this();
+        this.content = content;
+        this.sender = sender;
+        this.teamId = teamId;
+        this.type = type;
+    }
+    
     // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
+    }
     public String getContent() {
         return content;
     }
@@ -59,20 +86,12 @@ public class Message {
         this.sender = sender;
     }
     
-    public String getRecipient() {
-        return recipient;
+    public Long getTeamId() {
+        return teamId;
     }
     
-    public void setRecipient(String recipient) {
-        this.recipient = recipient;
-    }
-    
-    public String getConversationId() {
-        return conversationId;
-    }
-    
-    public void setConversationId(String conversationId) {
-        this.conversationId = conversationId;
+    public void setTeamId(Long teamId) {
+        this.teamId = teamId;
     }
     
     public LocalDateTime getTimestamp() {
@@ -91,13 +110,24 @@ public class Message {
         this.type = type;
     }
     
+    public boolean isDelivered() {
+        return delivered;
+    }
+    
+    public void setDelivered(boolean delivered) {
+        this.delivered = delivered;
+    }
+    
     @Override
     public String toString() {
         return "Message{" +
-                "content='" + content + '\'' +
+                "id=" + id +
+                ", content='" + content + '\'' +
                 ", sender='" + sender + '\'' +
+                ", teamId=" + teamId +
                 ", timestamp=" + timestamp +
                 ", type=" + type +
+                ", delivered=" + delivered +
                 '}';
     }
 }

@@ -2,7 +2,9 @@ package com.actormodelsasps.demo.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * User entity representing registered users
@@ -35,6 +37,9 @@ public class User {
     
     @Column(name = "is_online")
     private boolean online = false;
+    
+    @ManyToMany(mappedBy = "members")
+    private Set<Team> teams = new HashSet<>();
     
     // Default constructor
     public User() {
@@ -99,6 +104,14 @@ public class User {
         if (online) {
             this.lastSeen = LocalDateTime.now();
         }
+    }
+    
+    public Set<Team> getTeams() {
+        return teams;
+    }
+    
+    public void setTeams(Set<Team> teams) {
+        this.teams = teams;
     }
     
     @Override
