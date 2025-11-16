@@ -1,0 +1,188 @@
+package com.actormodelsasps.demo.controller;
+
+import com.actormodelsasps.demo.model.Contact;
+import com.actormodelsasps.demo.model.User;
+import com.actormodelsasps.demo.service.ContactService;
+import com.actormodelsasps.demo.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * REST Controller for authentication and user management
+ */
+@RestController
+@RequestMapping("/api/auth")
+@CrossOrigin(origins = "*") // Allow all origins for development
+public class AuthController {
+    
+    @Autowired
+    private UserService userService;
+    
+    @Autowired
+    private ContactService contactService;
+    
+    /**
+     * Register a new user
+     */
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+        try {
+            // Validate input
+            if (request.getUsername() == null || request.getUsername().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Username is required"));
+            }
+            
+            if (request.getPassword() == null || request.getPassword().length() < 3) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 3 characters"));
+            }
+            
+            // Register user
+            User user = userService.registerUser(request.getUsername().trim(), request.getPassword());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "User registered successfully");
+            response.put("username", user.getUsername());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Registration failed"));
+        }
+    }
+    
+    /**
+     * Login user
+     */
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+        try {
+            // Validate input
+            if (request.getUsername() == null || request.getUsername().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Username is required"));
+            }
+            
+            if (request.getPassword() == null || request.getPassword().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Password is required"));
+            }
+            
+            // Authenticate user
+            boolean authenticated = userService.authenticateUser(request.getUsername().trim(), request.getPassword());
+            
+            if (authenticated) {
+                // Set user as online
+                userService.setUserOnline(request.getUsername().trim(), true);
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", "Login successful");
+                response.put("username", request.getUsername().trim());
+                
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.status(401).body(Map.of("error", "Invalid username or password"));
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Login failed"));
+        }
+    }
+    
+    /**
+     * Logout user
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestBody Map<String, String> request) {
+        try {
+            String username = request.get("username");
+            if (username != null && !username.trim().isEmpty()) {
+                userService.setUserOnline(username.trim(), false);
+            }
+            
+            return ResponseEntity.ok(Map.of("success", true, "message", "Logged out successfully"));
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Logout failed"));
+        }
+    }
+    
+    /**
+     * Get user's contacts
+     */
+    @GetMapping("/contacts/{username}")
+    public ResponseEntity<?> getContacts(@PathVariable String username) {
+        try {
+            List<Contact> contacts = contactService.getContactsForUser(username);
+            return ResponseEntity.ok(Map.of("contacts", contacts));
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to retrieve contacts"));
+        }
+    }
+    
+    /**
+     * Get online users
+     */
+    @GetMapping("/online-users")
+    public ResponseEntity<?> getOnlineUsers() {
+        try {
+            List<User> onlineUsers = userService.getOnlineUsers();
+            return ResponseEntity.ok(Map.of("onlineUsers", onlineUsers));
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to retrieve online users"));
+        }
+    }
+    
+    // Request DTOs
+    public static class RegisterRequest {
+        private String username;
+        private String password;
+        
+        // Getters and Setters
+        public String getUsername() {
+            return username;
+        }
+        
+        public void setUsername(String username) {
+            this.username = username;
+        }
+        
+        public String getPassword() {
+            return password;
+        }
+        
+        public void setPassword(String password) {
+            this.password = password;
+        }
+    }
+    
+    public static class LoginRequest {
+        private String username;
+        private String password;
+        
+        // Getters and Setters
+        public String getUsername() {
+            return username;
+        }
+        
+        public void setUsername(String username) {
+            this.username = username;
+        }
+        
+        public String getPassword() {
+            return password;
+        }
+        
+        public void setPassword(String password) {
+            this.password = password;
+        }
+    }
+}

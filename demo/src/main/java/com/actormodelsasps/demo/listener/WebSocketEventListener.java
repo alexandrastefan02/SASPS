@@ -1,25 +1,24 @@
 package com.actormodelsasps.demo.listener;
 
-import com.actormodelsasps.demo.model.ChatUser;
-import com.actormodelsasps.demo.model.Message;
-import com.actormodelsasps.demo.service.SessionManager;
+import com.actormodelsasps.demo.service.PrivateMessageService;
+import com.actormodelsasps.demo.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
-import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
-import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * WebSocketEventListener - Handles WebSocket connection lifecycle events
+ * WebSocketEventListener - Handles WebSocket connection lifecycle events for private messaging
  * 
  * THREAD-BASED BEHAVIOR:
  * - These event handlers run on threads from the thread pool
  * - Can be called concurrently when multiple clients connect/disconnect
- * - That's why SessionManager uses thread-safe collections!
+ * - Manages user online status and private messaging sessions
  * 
  * Events:
  * 1. SessionConnectedEvent  - When WebSocket handshake completes
@@ -29,10 +28,13 @@ import java.time.LocalDateTime;
 public class WebSocketEventListener {
     
     @Autowired
-    private SessionManager sessionManager;
+    private PrivateMessageService privateMessageService;
     
     @Autowired
-    private SimpMessageSendingOperations messagingTemplate;
+    private UserService userService;
+    
+    // Store session-to-username mapping for cleanup
+    private final Map<String, String> sessionToUsername = new ConcurrentHashMap<>();
     
     /**
      * Handle new WebSocket connections
@@ -54,7 +56,7 @@ public class WebSocketEventListener {
     }
     
     /**
-     * Handle WebSocket disconnections
+     * Handle WebSocket disconnections for private messaging
      * 
      * Called when:
      * - Client closes connection
@@ -73,36 +75,37 @@ public class WebSocketEventListener {
         System.out.println("   Thread: " + Thread.currentThread().getName());
         System.out.println("   Session ID: " + sessionId);
         
-        // Remove user from session manager
-        // ⚠️ CRITICAL SECTION: Multiple threads might call this simultaneously!
-        // SessionManager.removeUser() uses ConcurrentHashMap which is thread-safe
-        ChatUser disconnectedUser = sessionManager.removeUser(sessionId);
+        // Find username associated with this session
+        String username = sessionToUsername.get(sessionId);
         
-        if (disconnectedUser != null) {
-            String username = disconnectedUser.getUsername();
+        if (username != null) {
             System.out.println("   User: " + username);
             
-            // Create leave notification
-            Message leaveMessage = new Message();
-            leaveMessage.setType(Message.MessageType.LEAVE);
-            leaveMessage.setSender(username);
-            leaveMessage.setContent(username + " left the chat.");
-            leaveMessage.setTimestamp(LocalDateTime.now());
+            // Remove from session mapping
+            sessionToUsername.remove(sessionId);
             
-            // Store leave message
-            sessionManager.addMessage(leaveMessage);
+            // Remove user session from private messaging service
+            privateMessageService.removeUserSession(username);
             
-            // Broadcast leave notification to all remaining clients
-            messagingTemplate.convertAndSend("/topic/messages", leaveMessage);
+            // Set user as offline in database
+            userService.setUserOnline(username, false);
             
-            System.out.println("   Notification sent: ✅");
+            System.out.println("   User set offline: ✅");
             
-            // Print updated statistics
-            sessionManager.printStats();
+            // Get current active users for debugging
+            System.out.println("   Active users: " + privateMessageService.getActiveUsers().size());
         } else {
-            System.out.println("   User not found (may have already left)");
+            System.out.println("   User not found (session may not have been registered)");
         }
         
         System.out.println("═════════════════════════════════════════\n");
+    }
+    
+    /**
+     * Register username for a session (called from PrivateMessageController)
+     */
+    public void registerSession(String sessionId, String username) {
+        sessionToUsername.put(sessionId, username);
+        System.out.println("🔗 Session registered: " + username + " -> " + sessionId);
     }
 }

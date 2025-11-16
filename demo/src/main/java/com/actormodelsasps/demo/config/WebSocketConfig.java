@@ -44,21 +44,28 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     /**
      * Configure message broker
      * 
-     * Message broker handles routing and broadcasting:
-     * - /topic/* : Broadcast to all subscribers (pub/sub)
+     * Message broker handles routing for private messaging:
+     * - /queue/* : Private queues for user-specific messages (1-to-1)
+     * - /topic/* : Broadcast queues (for system notifications, if needed)
      * - /app/*   : Routes to @MessageMapping in controllers
      */
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        // Enable simple in-memory message broker
-        // Messages sent to /topic/* will be broadcast to all subscribers
-        registry.enableSimpleBroker("/topic");
+        // Enable simple in-memory message broker for both queues and topics
+        // /queue/* for private 1-to-1 messages
+        // /topic/* for system-wide notifications (if needed)
+        registry.enableSimpleBroker("/queue", "/topic");
         
         // Messages sent to /app/* will be routed to @MessageMapping methods
         registry.setApplicationDestinationPrefixes("/app");
         
+        // Set user destination prefix for private messaging
+        registry.setUserDestinationPrefix("/user");
+        
         System.out.println("✅ Message broker configured:");
-        System.out.println("   - Broker: /topic/*");
+        System.out.println("   - Private queues: /queue/*");
+        System.out.println("   - Broadcast topics: /topic/*");
         System.out.println("   - Application: /app/*");
+        System.out.println("   - User destinations: /user/*");
     }
 }

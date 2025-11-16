@@ -13,17 +13,21 @@ import java.time.LocalDateTime;
 public class Message {
     
     private String content;           // The actual message text
-    private String sender;             // Username of who sent it
+    private String sender;            // Username of who sent it
+    private String recipient;         // Username of who should receive it (for 1-to-1)
     private LocalDateTime timestamp;   // When it was sent
-    private MessageType type;          // Type of message (CHAT, JOIN, LEAVE)
+    private MessageType type;          // Type of message (PRIVATE, JOIN, LEAVE, etc.)
+    private String conversationId;     // Unique identifier for the conversation
     
     /**
      * Message types for different events
      */
     public enum MessageType {
-        CHAT,    // Regular chat message
-        JOIN,    // User joined notification
-        LEAVE    // User left notification
+        PRIVATE,    // Private 1-to-1 message
+        JOIN,       // User joined notification
+        LEAVE,      // User left notification
+        TYPING,     // Typing indicator
+        DELIVERY_RECEIPT  // Message delivery confirmation
     }
     
     // Default constructor (required for JSON deserialization)
@@ -53,6 +57,22 @@ public class Message {
     
     public void setSender(String sender) {
         this.sender = sender;
+    }
+    
+    public String getRecipient() {
+        return recipient;
+    }
+    
+    public void setRecipient(String recipient) {
+        this.recipient = recipient;
+    }
+    
+    public String getConversationId() {
+        return conversationId;
+    }
+    
+    public void setConversationId(String conversationId) {
+        this.conversationId = conversationId;
     }
     
     public LocalDateTime getTimestamp() {

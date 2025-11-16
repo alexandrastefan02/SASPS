@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Private Chat Client</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Login Screen */
+        .login-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            flex-direction: column;
+        }
+        
+        .login-form {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            min-width: 350px;
+        }
+        
+        .login-form h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-weight: bold;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        .form-group input:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+        
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+        
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+        
+        .error {
+            color: #e53e3e;
+            margin-top: 10px;
+            text-align: center;
+        }
+        
+        .success {
+            color: #38a169;
+            margin-top: 10px;
+            text-align: center;
+        }
+        
+        /* Chat Interface */
+        .chat-interface {
+            display: none;
+            height: 100%;
+            flex-direction: row;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: #f7fafc;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            background: #4a5568;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .user-info {
+            font-weight: bold;
+        }
+        
+        .logout-btn {
+            background: transparent;
+            border: 1px solid white;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .contacts-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .contact-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e2e8f0;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .contact-item:hover {
+            background: #edf2f7;
+        }
+        
+        .contact-item.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .contact-name {
+            font-weight: bold;
+        }
+        
+        .online-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #68d391;
+        }
+        
+        .offline-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #cbd5e0;
+        }
+        
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            padding: 20px;
+            background: #edf2f7;
+            border-bottom: 1px solid #e2e8f0;
+            font-weight: bold;
+            color: #4a5568;
+        }
+        
+        .messages-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f9f9f9;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .message.own {
+            justify-content: flex-end;
+        }
+        
+        .message-bubble {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+        
+        .message.own .message-bubble {
+            background: #667eea;
+            color: white;
+        }
+        
+        .message:not(.own) .message-bubble {
+            background: white;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .message-time {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+        
+        .message-input {
+            padding: 20px;
+            border-top: 1px solid #e2e8f0;
+            background: white;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .message-input input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            outline: none;
+        }
+        
+        .message-input input:focus {
+            border-color: #667eea;
+        }
+        
+        .send-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+        }
+        
+        .send-btn:hover {
+            background: #5a67d8;
+        }
+        
+        .send-btn:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .status.connected {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+        
+        .status.disconnected {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+        
+        .no-chat-selected {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #a0aec0;
+            font-size: 18px;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Login Screen -->
+        <div class="login-screen" id="loginScreen">
+            <div class="login-form">
+                <h2>Private Chat Login</h2>
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" placeholder="Enter your username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" placeholder="Enter your password" required>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="login()">Login</button>
+                <button type="button" class="btn btn-secondary" onclick="showRegister()">Register New Account</button>
+                <div id="loginError" class="error"></div>
+                <div id="loginSuccess" class="success"></div>
+                
+                <!-- Register Form (hidden by default) -->
+                <div id="registerForm" style="display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
+                    <h3>Register New Account</h3>
+                    <div class="form-group">
+                        <label for="regUsername">Username:</label>
+                        <input type="text" id="regUsername" placeholder="Choose a username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="regPassword">Password:</label>
+                        <input type="password" id="regPassword" placeholder="Choose a password" required>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="register()">Create Account</button>
+                    <button type="button" class="btn btn-secondary" onclick="showLogin()">Back to Login</button>
+                    <div id="registerError" class="error"></div>
+                    <div id="registerSuccess" class="success"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Chat Interface -->
+        <div class="chat-interface" id="chatInterface">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <div class="user-info" id="currentUser">User</div>
+                    <button class="logout-btn" onclick="logout()">Logout</button>
+                </div>
+                <div class="contacts-list" id="contactsList">
+                    <div class="status" id="connectionStatus">Connecting...</div>
+                </div>
+            </div>
+            
+            <!-- Chat Area -->
+            <div class="chat-area">
+                <div class="chat-header" id="chatHeader">
+                    <div class="no-chat-selected">Select a contact to start chatting</div>
+                </div>
+                <div class="messages-container" id="messagesContainer">
+                    <!-- Messages will be added here -->
+                </div>
+                <div class="message-input" id="messageInput" style="display: none;">
+                    <input type="text" id="messageText" placeholder="Type a message..." onkeypress="handleEnter(event)">
+                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script>
+        let stompClient = null;
+        let currentUser = null;
+        let currentChat = null;
+        let contacts = {};
+
+        // Demo users with passwords (for easy testing)
+        const demoUsers = {
+            'alice': 'password123',
+            'bob': 'password123', 
+            'charlie': 'password123',
+            'diana': 'password123',
+            'eve': 'password123'
+        };
+
+        function showLogin() {
+            document.getElementById('registerForm').style.display = 'none';
+            clearMessages();
+        }
+
+        function showRegister() {
+            document.getElementById('registerForm').style.display = 'block';
+            clearMessages();
+        }
+
+        function clearMessages() {
+            document.getElementById('loginError').textContent = '';
+            document.getElementById('loginSuccess').textContent = '';
+            document.getElementById('registerError').textContent = '';
+            document.getElementById('registerSuccess').textContent = '';
+        }
+
+        async function register() {
+            const username = document.getElementById('regUsername').value.trim();
+            const password = document.getElementById('regPassword').value;
+
+            if (!username || !password) {
+                document.getElementById('registerError').textContent = 'Please fill in all fields';
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:8080/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('registerSuccess').textContent = 'Account created successfully! You can now login.';
+                    document.getElementById('registerError').textContent = '';
+                    // Clear form
+                    document.getElementById('regUsername').value = '';
+                    document.getElementById('regPassword').value = '';
+                } else {
+                    document.getElementById('registerError').textContent = data.error || 'Registration failed';
+                    document.getElementById('registerSuccess').textContent = '';
+                }
+            } catch (error) {
+                document.getElementById('registerError').textContent = 'Network error. Please try again.';
+                console.error('Registration error:', error);
+            }
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                document.getElementById('loginError').textContent = 'Please enter username and password';
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:8080/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentUser = username;
+                    document.getElementById('currentUser').textContent = username;
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('chatInterface').style.display = 'flex';
+                    
+                    // Connect to WebSocket
+                    connect();
+                    
+                    // Load contacts
+                    loadContacts();
+                } else {
+                    document.getElementById('loginError').textContent = data.error || 'Login failed';
+                }
+            } catch (error) {
+                document.getElementById('loginError').textContent = 'Network error. Please try again.';
+                console.error('Login error:', error);
+            }
+        }
+
+        function connect() {
+            const socket = new SockJS('http://localhost:8080/ws');
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function (frame) {
+                console.log('Connected: ' + frame);
+                updateConnectionStatus('Connected', true);
+                
+                // Register user for private messaging
+                stompClient.send("/app/private.register", {}, JSON.stringify({
+                    'username': currentUser
+                }));
+                
+                // Subscribe to private messages
+                stompClient.subscribe('/queue/messages/' + currentUser, function (message) {
+                    const messageData = JSON.parse(message.body);
+                    displayMessage(messageData);
+                });
+                
+                // Subscribe to typing indicators
+                stompClient.subscribe('/queue/typing/' + currentUser, function (message) {
+                    const typingData = JSON.parse(message.body);
+                    handleTypingIndicator(typingData);
+                });
+                
+            }, function(error) {
+                console.error('Connection error:', error);
+                updateConnectionStatus('Disconnected', false);
+            });
+        }
+
+        async function loadContacts() {
+            try {
+                const response = await fetch(`http://localhost:8080/api/auth/contacts/${currentUser}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayContacts(data.contacts);
+                } else {
+                    console.error('Failed to load contacts:', data.error);
+                }
+            } catch (error) {
+                console.error('Error loading contacts:', error);
+            }
+        }
+
+        function displayContacts(contactList) {
+            const container = document.getElementById('contactsList');
+            container.innerHTML = '<div class="status connected" id="connectionStatus">Connected</div>';
+            
+            contactList.forEach(contact => {
+                contacts[contact.username] = contact;
+                
+                const contactDiv = document.createElement('div');
+                contactDiv.className = 'contact-item';
+                contactDiv.setAttribute('data-username', contact.username);
+                contactDiv.onclick = () => openChat(contact.username);
+                
+                contactDiv.innerHTML = `
+                    <div class="contact-name">${contact.displayName}</div>
+                    <div class="${contact.online ? 'online-indicator' : 'offline-indicator'}"></div>
+                `;
+                
+                container.appendChild(contactDiv);
+            });
+        }
+
+        function openChat(username) {
+            // Update active contact
+            document.querySelectorAll('.contact-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`[data-username="${username}"]`).classList.add('active');
+            
+            // Update chat header
+            currentChat = username;
+            const contact = contacts[username];
+            document.getElementById('chatHeader').innerHTML = `
+                Chatting with ${contact.displayName}
+                <span style="font-size: 12px; color: #666; font-weight: normal;">
+                    ${contact.online ? '🟢 Online' : '⚪ Offline'}
+                </span>
+            `;
+            
+            // Show message input
+            document.getElementById('messageInput').style.display = 'flex';
+            
+            // Clear messages (in a real app, you'd load conversation history)
+            document.getElementById('messagesContainer').innerHTML = '';
+            
+            // Focus message input
+            document.getElementById('messageText').focus();
+        }
+
+        function sendMessage() {
+            const messageText = document.getElementById('messageText');
+            const content = messageText.value.trim();
+            
+            if (!content || !currentChat || !stompClient) {
+                return;
+            }
+            
+            const message = {
+                sender: currentUser,
+                recipient: currentChat,
+                content: content,
+                type: 'PRIVATE'
+            };
+            
+            stompClient.send("/app/private.send", {}, JSON.stringify(message));
+            messageText.value = '';
+        }
+
+        function displayMessage(message) {
+            const container = document.getElementById('messagesContainer');
+            const messageDiv = document.createElement('div');
+            
+            const isOwn = message.sender === currentUser;
+            messageDiv.className = `message ${isOwn ? 'own' : ''}`;
+            
+            const time = new Date(message.timestamp).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            messageDiv.innerHTML = `
+                <div class="message-bubble">
+                    ${message.content}
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+            
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function handleTypingIndicator(typingData) {
+            // Implement typing indicator logic
+            console.log('Typing indicator:', typingData);
+        }
+
+        function handleEnter(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function updateConnectionStatus(status, isConnected) {
+            const statusElement = document.getElementById('connectionStatus');
+            statusElement.textContent = status;
+            statusElement.className = `status ${isConnected ? 'connected' : 'disconnected'}`;
+        }
+
+        async function logout() {
+            try {
+                await fetch('http://localhost:8080/api/auth/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username: currentUser })
+                });
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+            
+            if (stompClient) {
+                stompClient.disconnect();
+            }
+            
+            currentUser = null;
+            currentChat = null;
+            contacts = {};
+            
+            document.getElementById('chatInterface').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            clearMessages();
+        }
+
+        // Auto-fill demo credentials helper
+        function fillDemoCredentials(username) {
+            document.getElementById('username').value = username;
+            document.getElementById('password').value = demoUsers[username];
+        }
+
+        // Add demo user buttons for easier testing
+        window.onload = function() {
+            const loginForm = document.querySelector('.login-form');
+            const demoDiv = document.createElement('div');
+            demoDiv.innerHTML = `
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+                    <p style="color: #666; font-size: 14px; margin-bottom: 10px;">Quick Demo Login:</p>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                        ${Object.keys(demoUsers).map(user => 
+                            `<button type="button" class="btn btn-secondary" style="flex: none; width: auto; padding: 5px 10px; font-size: 12px;" 
+                             onclick="fillDemoCredentials('${user}')">${user}</button>`
+                        ).join('')}
+                    </div>
+                </div>
+            `;
+            loginForm.appendChild(demoDiv);
+        };
+    </script>
+</body>
+</html>
