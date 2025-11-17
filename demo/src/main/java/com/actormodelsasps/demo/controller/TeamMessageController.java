@@ -56,6 +56,10 @@ public class TeamMessageController {
         System.out.println("   Session ID: " + sessionId);
         System.out.println("   Thread: " + Thread.currentThread().getName());
         
+        // CRITICAL: Set user principal for Spring's user destination resolution
+        headerAccessor.setUser(() -> username);
+        System.out.println("👤 User Principal set for session: " + username);
+        
         // Register user session
         teamMessageService.registerUserSession(username, sessionId);
         

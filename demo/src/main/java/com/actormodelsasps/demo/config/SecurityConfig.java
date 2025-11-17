@@ -35,6 +35,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()  // Allow public access to auth endpoints
                 .requestMatchers("/ws/**").permitAll()        // Allow WebSocket connections
                 .requestMatchers("/h2-console/**").permitAll() // Allow H2 console access (development)
+                .requestMatchers("/**").permitAll()           // Allow all static resources
                 .anyRequest().authenticated()                 // All other requests need authentication
             )
             

@@ -33,6 +33,12 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
     List<Team> findTeamsByUserId(@Param("userId") Long userId);
     
     /**
+     * Check if a user is a member of a specific team
+     */
+    @Query("SELECT COUNT(t) > 0 FROM Team t JOIN t.members m WHERE t.id = :teamId AND m.id = :userId")
+    boolean isUserMemberOfTeam(@Param("teamId") Long teamId, @Param("userId") Long userId);
+    
+    /**
      * Find teams created by a specific user
      */
     List<Team> findByOwnerId(Long ownerId);

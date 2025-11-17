@@ -1,6 +1,8 @@
 package com.actormodelsasps.demo.config;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -22,6 +24,9 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @Configuration
 @EnableWebSocketMessageBroker  // Enable WebSocket message handling backed by message broker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+    
+    @Autowired
+    private UserInterceptor userInterceptor;
     
     /**
      * Register STOMP endpoints
@@ -67,5 +72,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         System.out.println("   - Broadcast topics: /topic/*");
         System.out.println("   - Application: /app/*");
         System.out.println("   - User destinations: /user/*");
+    }
+    
+    /**
+     * Configure client inbound channel to add user interceptor
+     */
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(userInterceptor);
+        System.out.println("✅ User interceptor registered for authentication");
     }
 }

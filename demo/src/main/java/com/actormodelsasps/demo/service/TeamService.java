@@ -127,14 +127,13 @@ public class TeamService {
     /**
      * Check if user is a member of a team
      */
+    @Transactional(readOnly = true)
     public boolean isUserMemberOfTeam(String username, Long teamId) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
         
-        Team team = teamRepository.findById(teamId)
-                .orElseThrow(() -> new RuntimeException("Team not found with ID: " + teamId));
-        
-        return team.getMembers().contains(user);
+        // Use query to avoid lazy loading issues
+        return teamRepository.isUserMemberOfTeam(teamId, user.getId());
     }
     
     /**

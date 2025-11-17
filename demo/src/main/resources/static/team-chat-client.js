@@ -129,7 +129,13 @@ function connectWebSocket() {
     // Disable debug logging
     stompClient.debug = null;
     
-    stompClient.connect({}, onConnected, onError);
+    // Connect with username in headers for user destination resolution
+    const headers = {
+        username: currentUser
+    };
+    
+    stompClient.connect(headers, onConnected, onError);
+    console.log('🔐 Connecting with username:', currentUser);
 }
 
 function onConnected() {
@@ -292,7 +298,8 @@ async function enterTeam(team) {
 function subscribeToTeam(teamId) {
     // Subscribe to team messages
     const messageDestination = `/user/queue/team/${teamId}/messages`;
-    stompClient.subscribe(messageDestination, function(message) {
+    teamSubscription = stompClient.subscribe(messageDestination, function(message) {
+        console.log('📨 Received team message:', message.body);
         const messageData = JSON.parse(message.body);
         displayMessage(messageData);
     });
@@ -365,6 +372,7 @@ function sendMessage() {
     const content = input.value.trim();
     
     if (!content || !currentTeam || !stompClient || !stompClient.connected) {
+        console.warn('⚠️ Cannot send message:', { content: !!content, currentTeam: !!currentTeam, connected: stompClient?.connected });
         return;
     }
     
@@ -375,6 +383,7 @@ function sendMessage() {
         type: 'CHAT'
     };
     
+    console.log('📤 Sending message:', message);
     stompClient.send("/app/team.send", {}, JSON.stringify(message));
     
     input.value = '';
@@ -388,11 +397,20 @@ function handleKeyPress(event) {
 }
 
 function displayMessage(message) {
+    console.log('🖼️ Displaying message:', message);
+    
     const container = document.getElementById('messagesContainer');
+    if (!container) {
+        console.error('❌ messagesContainer not found!');
+        return;
+    }
+    
     const messageDiv = document.createElement('div');
     
     const isOwn = message.sender === currentUser;
     const isSystem = message.type === 'JOIN' || message.type === 'LEAVE' || message.type === 'SYSTEM';
+    
+    console.log('   Type:', message.type, '| isSystem:', isSystem, '| isOwn:', isOwn);
     
     if (isSystem) {
         messageDiv.className = 'message system';
@@ -421,6 +439,7 @@ function displayMessage(message) {
     
     container.appendChild(messageDiv);
     container.scrollTop = container.scrollHeight;
+    console.log('   ✅ Message displayed');
 }
 
 function formatTime(timestamp) {

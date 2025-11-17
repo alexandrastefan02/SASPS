@@ -105,9 +105,12 @@ public class TeamMessageService {
                 // Send to online members
                 if (userSessions.containsKey(username)) {
                     String destination = "/queue/team/" + teamId + "/messages";
+                    System.out.println("   📤 Sending to: " + username);
+                    System.out.println("      Destination: /user/" + username + destination);
+                    System.out.println("      Session: " + userSessions.get(username));
                     messagingTemplate.convertAndSendToUser(username, destination, savedMessage);
                     deliveredCount++;
-                    System.out.println("   📤 Sent to online member: " + username);
+                    System.out.println("   ✅ Sent to online member: " + username);
                 }
             }
             
