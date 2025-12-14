@@ -931,7 +931,7 @@ async function startPrivateChat(user) {
     try {
         // Check if conversation already exists
         for (const [id, conv] of AppState.conversations) {
-            if (conv.type === 'PRIVATE' && Number(conv.participantId) === user.id) {
+            if (conv.type === 'PRIVATE' && String(conv.participantId) === String(user.id)) {
                 console.log('✅ Conversation already exists, opening it');
                 openConversation(conv);
                 return;
