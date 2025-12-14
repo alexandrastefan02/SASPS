@@ -169,6 +169,37 @@
             background: #ebe9e6;
         }
         
+        /* Apple-style Spinner */
+        .loading-spinner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: #6a6d55;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(168, 171, 135, 0.2);
+            border-top-color: #a8ab87;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 16px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 13px;
+            color: #6a6d55;
+            font-weight: 400;
+        }
+        
         .conversation-item {
             background: white;
             border-radius: 0;
@@ -387,9 +418,35 @@
             max-width: 450px;
             width: 90%;
             border-top: 3px solid #a8ab87;
+            position: relative;
         }
         
-        .modal-header { font-size: 22px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #a8ab87; color: #2a2a28; font-weight: 600; }
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 24px;
+            color: #6a6d55;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+            padding: 0;
+            line-height: 1;
+        }
+        
+        .modal-close:hover {
+            background: #f0f0ed;
+            color: #2a2a28;
+        }
+        
+        .modal-header { font-size: 22px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #a8ab87; color: #2a2a28; font-weight: 600; padding-right: 40px; }
         
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; margin-bottom: 6px; color: #6a6d55; font-weight: 600; font-size: 13px; }
@@ -485,7 +542,10 @@
                 </div>
                 
                 <div class="conversations-list" id="conversationsList">
-                    <div id="loadingMessage" class="loading">Loading...</div>
+                    <div id="loadingMessage" class="loading-spinner">
+                        <div class="spinner"></div>
+                        <div class="loading-text">Loading conversations...</div>
+                    </div>
                     <div id="emptyState" class="empty-state" style="display: none;">
                         <div>No conversations yet</div>
                         <div style="font-size: 12px; margin-top: 8px;">Search for people or join a team!</div>
@@ -531,6 +591,7 @@
     <!-- Team Modal -->
     <div id="teamModal" class="modal">
         <div class="modal-content">
+            <button class="modal-close" onclick="closeTeamModal()" aria-label="Close">×</button>
             <div class="modal-header">Join or Create Team</div>
             
             <div class="form-group">
@@ -546,10 +607,6 @@
                 <input type="text" id="createTeamName" placeholder="Enter new team name...">
             </div>
             <button class="btn btn-primary" onclick="createTeam()" style="width: 100%;">Create Team</button>
-            
-            <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="closeTeamModal()">Cancel</button>
-            </div>
             
             <div id="teamError" class="error" style="display: none;"></div>
         </div>

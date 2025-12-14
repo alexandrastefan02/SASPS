@@ -15,7 +15,8 @@ const AppState = {
     currentTeamSubscription: null,
     conversations: new Map(), // id -> conversation object
     searchTimeout: null,
-    domReady: false
+    domReady: false,
+    isLoading: true // Track if initial load is in progress
 };
 
 // ============================================================================
@@ -217,6 +218,9 @@ async function loadConversations(clearExisting = true) {
     try {
         console.log('📥 Loading conversations from server...');
         
+        // Show loading state
+        AppState.isLoading = true;
+        
         // Check if teams changed (from team page)
         if (localStorage.getItem('teamsChanged') === 'true') {
             console.log('   🔄 Teams changed detected, forcing refresh');
@@ -264,6 +268,9 @@ async function loadConversations(clearExisting = true) {
             
             console.log('   Final AppState.conversations size:', AppState.conversations.size);
             
+            // Loading complete
+            AppState.isLoading = false;
+            
             // Trigger re-render
             EventBus.emit('conversations:updated');
             
@@ -275,12 +282,14 @@ async function loadConversations(clearExisting = true) {
         }
     } catch (error) {
         console.error('❌ Error loading conversations:', error);
+        AppState.isLoading = false; // Stop loading on error
     }
 }
 
 function renderConversationList() {
     console.log('🎨 Rendering conversation list...');
     console.log('   AppState.conversations size:', AppState.conversations.size);
+    console.log('   AppState.isLoading:', AppState.isLoading);
     console.log('   AppState.conversations:', Array.from(AppState.conversations.values()));
     const listEl = document.getElementById('conversationsList');
     const emptyEl = document.getElementById('emptyState');
@@ -289,6 +298,14 @@ function renderConversationList() {
     // Check if DOM elements exist before proceeding
     if (!listEl) {
         console.warn('⚠️ conversationsList element not found');
+        return;
+    }
+    
+    // If still loading, keep showing the spinner
+    if (AppState.isLoading) {
+        console.log('   ⏳ Still loading, keeping spinner visible');
+        if (loadingEl) loadingEl.style.display = 'flex';
+        if (emptyEl) emptyEl.style.display = 'none';
         return;
     }
     
