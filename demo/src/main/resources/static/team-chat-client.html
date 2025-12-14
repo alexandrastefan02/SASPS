@@ -12,8 +12,8 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #e8ddd9;
             padding: 20px;
             min-height: 100vh;
         }
@@ -21,13 +21,18 @@
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            background: transparent;
+            border-radius: 0;
+            box-shadow: none;
             overflow: hidden;
             height: 85vh;
             display: flex;
             flex-direction: column;
+        }
+        
+        .container.chat-active {
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         }
         
         /* Login Screen */
@@ -37,22 +42,26 @@
             justify-content: center;
             height: 100%;
             flex-direction: column;
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            background: transparent;
         }
         
         .login-form {
             background: white;
             padding: 50px;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            min-width: 400px;
+            border-radius: 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            min-width: 420px;
+            border-top: 3px solid #a8ab87;
         }
         
         .login-form h2 {
             text-align: center;
-            margin-bottom: 30px;
-            color: #333;
-            font-size: 28px;
+            margin-bottom: 35px;
+            color: #2a2a28;
+            font-size: 24px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
         
         .form-group {
@@ -62,79 +71,85 @@
         .form-group label {
             display: block;
             margin-bottom: 8px;
-            color: #666;
-            font-weight: 600;
-            font-size: 14px;
+            color: #6a6d55;
+            font-weight: 500;
+            font-size: 13px;
+            letter-spacing: 0.3px;
         }
         
         .form-group input {
             width: 100%;
-            padding: 14px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
+            padding: 12px 14px;
+            border: 1px solid #c8c8c4;
+            border-radius: 2px;
+            font-size: 14px;
+            transition: all 0.2s;
+            background: #fafaf9;
         }
         
         .form-group input:focus {
-            border-color: #667eea;
+            border-color: #a8ab87;
             outline: none;
+            background: white;
+            box-shadow: 0 0 0 2px rgba(168, 171, 135, 0.1);
         }
         
         .btn {
             width: 100%;
-            padding: 14px;
+            padding: 12px;
             border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
+            border-radius: 2px;
+            font-size: 14px;
+            font-weight: 400;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
             margin-top: 10px;
+            letter-spacing: 0.3px;
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #a8ab87;
             color: white;
         }
         
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            background: #97987a;
         }
         
         .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
+            background: #f5f5f3;
+            color: #4a4a48;
+            border: 1px solid #c8c8c4;
         }
         
         .btn-secondary:hover {
-            background: #e0e0e0;
+            background: #e8e8e5;
         }
         
         .error {
-            color: #e53e3e;
+            color: #c44b3c;
             margin-top: 15px;
             text-align: center;
-            font-size: 14px;
+            font-size: 13px;
         }
         
         .success {
-            color: #38a169;
+            color: #6a8a5b;
             margin-top: 15px;
             text-align: center;
-            font-size: 14px;
+            font-size: 13px;
         }
         
         .toggle-link {
             text-align: center;
             margin-top: 15px;
-            color: #667eea;
+            color: #a8ab87;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
         }
         
         .toggle-link:hover {
+            color: #8a8d6f;
             text-decoration: underline;
         }
         
@@ -144,14 +159,17 @@
             height: 100%;
             flex-direction: column;
             padding: 40px;
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+            background: transparent;
         }
         
         .team-selection h2 {
             text-align: center;
-            margin-bottom: 30px;
-            color: #333;
-            font-size: 32px;
+            margin-bottom: 35px;
+            color: #2a2a28;
+            font-size: 24px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
         
         .team-selection-content {
@@ -166,14 +184,17 @@
             flex: 1;
             background: white;
             padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            border-radius: 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border-top: 3px solid #a8ab87;
         }
         
         .team-section h3 {
             margin-bottom: 20px;
-            color: #667eea;
-            font-size: 20px;
+            color: #a8ab87;
+            font-size: 18px;
+            font-weight: 500;
+            letter-spacing: 0.3px;
         }
         
         .team-input-group {
@@ -182,10 +203,19 @@
         
         .team-input-group input {
             width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
+            padding: 11px 14px;
+            border: 1px solid #c8c8c4;
+            border-radius: 2px;
+            font-size: 13px;
+            background: #fafaf9;
+            transition: all 0.2s;
+        }
+        
+        .team-input-group input:focus {
+            border-color: #a8ab87;
+            outline: none;
+            background: white;
+            box-shadow: 0 0 0 2px rgba(168, 171, 135, 0.1);
         }
         
         .team-list {
@@ -195,26 +225,28 @@
         
         .team-item {
             padding: 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            margin-bottom: 10px;
+            border: 1px solid #d4d4d0;
+            border-radius: 0;
+            margin-bottom: 8px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
         }
         
         .team-item:hover {
-            border-color: #667eea;
-            background: #f8f9ff;
+            border-left-color: #997b7a;
+            background: #fafaf9;
         }
         
         .team-item h4 {
             margin-bottom: 5px;
-            color: #333;
+            color: #2a2a28;
+            font-weight: 500;
         }
         
         .team-item p {
             font-size: 12px;
-            color: #666;
+            color: #6a6a68;
         }
         
         /* Chat Interface */
@@ -503,7 +535,7 @@
         <!-- Login Screen -->
         <div class="login-screen" id="loginScreen">
             <div class="login-form">
-                <h2>Team Chat</h2>
+                <h2>TeamWork</h2>
                 <div id="loginFormContent">
                     <div class="form-group">
                         <label for="username">Username:</label>
@@ -594,7 +626,7 @@
             <!-- Chat Main -->
             <div class="chat-main">
                 <div class="chat-header">
-                    <div class="chat-title">Team Chat</div>
+                    <div class="chat-title">TeamWork</div>
                     <div class="connection-status" id="connectionStatus">Connecting...</div>
                 </div>
                 

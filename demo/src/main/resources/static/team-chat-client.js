@@ -304,6 +304,7 @@ async function enterTeam(team) {
     document.getElementById('currentTeamName').textContent = team.name;
     document.getElementById('teamSelection').style.display = 'none';
     document.getElementById('chatInterface').style.display = 'flex';
+    document.querySelector('.container').classList.add('chat-active');
     
     // Clear existing messages
     document.getElementById('messagesContainer').innerHTML = '';
@@ -432,6 +433,7 @@ function leaveTeam() {
     // Show team selection
     document.getElementById('chatInterface').style.display = 'none';
     document.getElementById('teamSelection').style.display = 'flex';
+    document.querySelector('.container').classList.remove('chat-active');
     
     // Reload teams
     loadUserTeams();

@@ -372,7 +372,7 @@ function createConversationElement(conv) {
         <div class="conversation-header">
             <div class="conversation-title">
                 <span class="conversation-name">${escapeHtml(name)}</span>
-                <span class="conversation-type ${isTeam ? 'team' : ''}">${isTeam ? 'TEAM' : '1-ON-1'}</span>
+                <span class="conversation-type ${isTeam ? 'team' : ''}">${isTeam ? 'TEAM' : 'PRIVATE'}</span>
                 ${onlineIndicator}
                 ${unreadBadge}
             </div>
