@@ -2,6 +2,7 @@ package com.actormodelsasps.demo.service;
 
 import com.actormodelsasps.demo.model.Team;
 import com.actormodelsasps.demo.model.User;
+import com.actormodelsasps.demo.repository.MessageRepository;
 import com.actormodelsasps.demo.repository.TeamRepository;
 import com.actormodelsasps.demo.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,9 @@ public class TeamService {
     
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private MessageRepository messageRepository;
     
     /**
      * Create a new team
@@ -127,13 +131,14 @@ public class TeamService {
     /**
      * Check if user is a member of a team
      */
-    @Transactional(readOnly = true)
     public boolean isUserMemberOfTeam(String username, Long teamId) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
         
-        // Use query to avoid lazy loading issues
-        return teamRepository.isUserMemberOfTeam(teamId, user.getId());
+        Team team = teamRepository.findByIdWithMembers(teamId)
+                .orElseThrow(() -> new RuntimeException("Team not found with ID: " + teamId));
+        
+        return team.getMembers().contains(user);
     }
     
     /**
@@ -158,5 +163,19 @@ public class TeamService {
      */
     public List<Team> getAllTeams() {
         return teamRepository.findAll();
+    }
+    
+    /**
+     * Get all messages for a team
+     */
+    public List<com.actormodelsasps.demo.model.Message> getTeamMessages(Long teamId) {
+        // Verify team exists
+        teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("Team not found with ID: " + teamId));
+        
+        // Get all messages for team, filtering for CHAT type only (exclude SYSTEM messages)
+        return messageRepository.findByTeamIdOrderByTimestampAsc(teamId).stream()
+                .filter(msg -> msg.getType() == com.actormodelsasps.demo.model.Message.MessageType.CHAT)
+                .collect(Collectors.toList());
     }
 }

@@ -4,11 +4,13 @@ import com.actormodelsasps.demo.service.TeamMessageService;
 import com.actormodelsasps.demo.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -32,6 +34,9 @@ public class WebSocketEventListener {
     
     @Autowired
     private UserService userService;
+    
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
     
     // Store session-to-username mapping for cleanup
     private final Map<String, String> sessionToUsername = new ConcurrentHashMap<>();
@@ -90,6 +95,9 @@ public class WebSocketEventListener {
             // Set user as offline in database
             userService.setUserOnline(username, false);
             
+            // Broadcast status change to all users
+            broadcastUserStatus(username, false);
+            
             System.out.println("   User set offline: ✅");
             
             // Get current active users for debugging
@@ -107,5 +115,18 @@ public class WebSocketEventListener {
     public void registerSession(String sessionId, String username) {
         sessionToUsername.put(sessionId, username);
         System.out.println("🔗 Session registered: " + username + " -> " + sessionId);
+    }
+    
+    /**
+     * Broadcast user online/offline status to all connected users
+     */
+    private void broadcastUserStatus(String username, boolean online) {
+        Map<String, Object> statusMessage = new HashMap<>();
+        statusMessage.put("username", username);
+        statusMessage.put("online", online);
+        statusMessage.put("timestamp", new java.util.Date());
+        
+        messagingTemplate.convertAndSend("/topic/user.status", statusMessage);
+        System.out.println("📢 Broadcasted status: " + username + " is " + (online ? "ONLINE" : "OFFLINE"));
     }
 }

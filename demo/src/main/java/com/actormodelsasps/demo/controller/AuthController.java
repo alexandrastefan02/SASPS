@@ -122,6 +122,60 @@ public class AuthController {
         }
     }
     
+    /**
+     * Search users by username
+     */
+    @GetMapping("/search")
+    public ResponseEntity<?> searchUsers(@RequestParam String query) {
+        try {
+            if (query == null || query.trim().length() < 2) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Query must be at least 2 characters"));
+            }
+            
+            List<User> users = userService.searchUsers(query.trim());
+            
+            // Convert to safe response format (without password)
+            List<Map<String, Object>> userList = users.stream()
+                .map(user -> {
+                    Map<String, Object> userMap = new HashMap<>();
+                    userMap.put("id", user.getId());
+                    userMap.put("username", user.getUsername());
+                    userMap.put("online", user.isOnline());
+                    return userMap;
+                })
+                .toList();
+            
+            return ResponseEntity.ok(Map.of("success", true, "users", userList));
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to search users"));
+        }
+    }
+    
+    /**
+     * Get user by username
+     */
+    @GetMapping("/user/{username}")
+    public ResponseEntity<?> getUserByUsername(@PathVariable String username) {
+        try {
+            User user = userService.getUserByUsername(username);
+            
+            if (user != null) {
+                Map<String, Object> userMap = new HashMap<>();
+                userMap.put("id", user.getId());
+                userMap.put("username", user.getUsername());
+                userMap.put("online", user.isOnline());
+                
+                return ResponseEntity.ok(Map.of("success", true, "user", userMap));
+            } else {
+                return ResponseEntity.status(404).body(Map.of("error", "User not found"));
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to retrieve user"));
+        }
+    }
+    
     // Request DTOs
     public static class RegisterRequest {
         private String username;

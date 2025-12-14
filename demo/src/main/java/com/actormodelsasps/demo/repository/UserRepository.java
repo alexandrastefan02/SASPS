@@ -40,4 +40,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     void updateUserOnlineStatus(@Param("username") String username, 
                                @Param("online") boolean online, 
                                @Param("lastSeen") LocalDateTime lastSeen);
+    
+    /**
+     * Search users by username (case-insensitive partial match)
+     */
+    List<User> findByUsernameContainingIgnoreCase(String username);
 }

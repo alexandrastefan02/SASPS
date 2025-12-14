@@ -8,8 +8,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +36,9 @@ public class TeamMessageController {
     @Autowired
     private UserService userService;
     
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+    
     /**
      * Register user for team messaging
      * 
@@ -56,15 +61,18 @@ public class TeamMessageController {
         System.out.println("   Session ID: " + sessionId);
         System.out.println("   Thread: " + Thread.currentThread().getName());
         
-        // CRITICAL: Set user principal for Spring's user destination resolution
+        // CRITICAL: Set the user Principal so Spring can route messages correctly
         headerAccessor.setUser(() -> username);
-        System.out.println("👤 User Principal set for session: " + username);
+        System.out.println("   User Principal set: " + headerAccessor.getUser());
         
         // Register user session
         teamMessageService.registerUserSession(username, sessionId);
         
         // Set user as online in database
         userService.setUserOnline(username, true);
+        
+        // Broadcast status change to all users
+        broadcastUserStatus(username, true);
         
         System.out.println("   ✅ User registered for team messaging");
         System.out.println("═════════════════════════════════════════\n");
@@ -119,7 +127,7 @@ public class TeamMessageController {
     public void sendTeamMessage(@Payload Map<String, Object> payload,
                                SimpMessageHeaderAccessor headerAccessor) {
         
-        String sender = (String) payload.get("sender");
+        String sender = (String) payload.get("username");
         Long teamId = Long.valueOf(payload.get("teamId").toString());
         String content = (String) payload.get("content");
         
@@ -173,7 +181,20 @@ public class TeamMessageController {
     }
     
     /**
-     * Leave team
+     * Broadcast user online/offline status to all connected users
+     */
+    private void broadcastUserStatus(String username, boolean online) {
+        Map<String, Object> statusMessage = new HashMap<>();
+        statusMessage.put("username", username);
+        statusMessage.put("online", online);
+        statusMessage.put("timestamp", new java.util.Date());
+        
+        messagingTemplate.convertAndSend("/topic/user.status", statusMessage);
+        System.out.println("📢 Broadcasted status: " + username + " is " + (online ? "ONLINE" : "OFFLINE"));
+    }
+    
+    /**
+     * Leave a team
      * 
      * Route: /app/team.leave
      */

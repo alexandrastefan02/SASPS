@@ -179,6 +179,40 @@ public class TeamController {
         }
     }
     
+    /**
+     * Get messages for a specific team
+     */
+    @GetMapping("/{teamId}/messages")
+    public ResponseEntity<?> getTeamMessages(@PathVariable Long teamId) {
+        try {
+            List<com.actormodelsasps.demo.model.Message> messages = teamService.getTeamMessages(teamId);
+            
+            List<Map<String, Object>> messageList = messages.stream()
+                .map(msg -> {
+                    Map<String, Object> messageMap = new HashMap<>();
+                    messageMap.put("id", msg.getId());
+                    messageMap.put("content", msg.getContent());
+                    messageMap.put("sender", msg.getSender());
+                    messageMap.put("teamId", msg.getTeamId());
+                    messageMap.put("timestamp", msg.getTimestamp().toString());
+                    messageMap.put("type", msg.getType() != null ? msg.getType().name() : "CHAT");
+                    return messageMap;
+                })
+                .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "messages", messageList
+            ));
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to load messages: " + e.getMessage()
+            ));
+        }
+    }
+    
     // Request DTOs
     public static class CreateTeamRequest {
         private String teamName;

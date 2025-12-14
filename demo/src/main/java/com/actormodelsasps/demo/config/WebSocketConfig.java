@@ -1,85 +1,77 @@
 package com.actormodelsasps.demo.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.messaging.simp.stomp.StompCommand;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
+import java.security.Principal;
+
 /**
- * WebSocket Configuration
+ * WebSocket configuration for real-time messaging
  * 
- * This class sets up:
- * 1. WebSocket endpoint - where clients connect (ws://localhost:8080/ws)
- * 2. Message broker - handles pub/sub messaging
- * 3. Application destination prefix - routes messages to controllers
- * 
- * Flow:
- * - Client connects to: ws://localhost:8080/ws
- * - Client subscribes to: /topic/messages (receives broadcasts)
- * - Client sends to: /app/chat.send (routed to @MessageMapping)
+ * This configuration sets up:
+ * 1. A STOMP endpoint at /ws for clients to connect
+ * 2. A message broker for broadcasting messages
+ * 3. Application destination prefix for message handling
+ * 4. User Principal authentication from connection headers
  */
 @Configuration
-@EnableWebSocketMessageBroker  // Enable WebSocket message handling backed by message broker
+@EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     
-    @Autowired
-    private UserInterceptor userInterceptor;
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry config) {
+        // Enable a simple memory-based message broker to carry messages back to clients
+        // on destinations prefixed with "/topic" and "/queue"
+        // Note: /user is NOT included here because it's handled by UserDestinationMessageHandler
+        config.enableSimpleBroker("/topic", "/queue");
+        
+        // Designate the "/app" prefix for messages bound for @MessageMapping-annotated methods
+        config.setApplicationDestinationPrefixes("/app");
+        
+        // Enable user-specific destinations
+        config.setUserDestinationPrefix("/user");
+    }
     
-    /**
-     * Register STOMP endpoints
-     * 
-     * STOMP = Simple Text Oriented Messaging Protocol
-     * It's a frame-based protocol that works over WebSocket
-     * 
-     * SockJS = Fallback options for browsers that don't support WebSocket
-     */
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws")          // WebSocket endpoint
-                .setAllowedOriginPatterns("*") // Allow all origins (for development)
-                .withSockJS();                 // Enable SockJS fallback options
-        
-        System.out.println("✅ WebSocket endpoint registered: ws://localhost:8080/ws");
-        System.out.println("✅ SockJS fallback enabled for browser compatibility");
+        // Register the "/ws" endpoint for WebSocket connections
+        // withSockJS() enables SockJS fallback options
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
     }
     
-    /**
-     * Configure message broker
-     * 
-     * Message broker handles routing for private messaging:
-     * - /queue/* : Private queues for user-specific messages (1-to-1)
-     * - /topic/* : Broadcast queues (for system notifications, if needed)
-     * - /app/*   : Routes to @MessageMapping in controllers
-     */
-    @Override
-    public void configureMessageBroker(MessageBrokerRegistry registry) {
-        // Enable simple in-memory message broker for both queues and topics
-        // /queue/* for private 1-to-1 messages
-        // /topic/* for system-wide notifications (if needed)
-        registry.enableSimpleBroker("/queue", "/topic");
-        
-        // Messages sent to /app/* will be routed to @MessageMapping methods
-        registry.setApplicationDestinationPrefixes("/app");
-        
-        // Set user destination prefix for private messaging
-        registry.setUserDestinationPrefix("/user");
-        
-        System.out.println("✅ Message broker configured:");
-        System.out.println("   - Private queues: /queue/*");
-        System.out.println("   - Broadcast topics: /topic/*");
-        System.out.println("   - Application: /app/*");
-        System.out.println("   - User destinations: /user/*");
-    }
-    
-    /**
-     * Configure client inbound channel to add user interceptor
-     */
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(userInterceptor);
-        System.out.println("✅ User interceptor registered for authentication");
+        registration.interceptors(new ChannelInterceptor() {
+            @Override
+            public Message<?> preSend(Message<?> message, MessageChannel channel) {
+                StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+                
+                if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+                    // Extract username from STOMP CONNECT headers
+                    String username = accessor.getFirstNativeHeader("username");
+                    if (username != null && !username.isEmpty()) {
+                        Principal user = () -> username;
+                        accessor.setUser(user);
+                        System.out.println("🔐 User Principal set at CONNECT: " + username + " (session: " + accessor.getSessionId() + ")");
+                    } else {
+                        System.out.println("⚠️ No username in CONNECT headers for session: " + accessor.getSessionId());
+                    }
+                }
+                
+                return message;
+            }
+        });
     }
 }

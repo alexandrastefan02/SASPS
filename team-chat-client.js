@@ -7,6 +7,34 @@ let currentTeam = null;
 let teamMembers = [];
 
 // ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if coming from conversations page
+    const urlParams = new URLSearchParams(window.location.search);
+    const skipLogin = urlParams.get('skipLogin');
+    
+    if (skipLogin === 'true') {
+        // User is coming from conversations, auto-login
+        currentUser = sessionStorage.getItem('username');
+        const teamId = sessionStorage.getItem('teamId');
+        const teamName = sessionStorage.getItem('teamName');
+        
+        if (currentUser && teamId && teamName) {
+            document.getElementById('currentUsername').textContent = currentUser;
+            
+            // Connect WebSocket
+            connectWebSocket();
+            
+            // Enter team directly
+            enterTeam({ id: parseInt(teamId), name: teamName });
+            return;
+        }
+    }
+});
+
+// ============================================================================
 // AUTHENTICATION
 // ============================================================================
 
@@ -95,17 +123,12 @@ async function login() {
 
         if (response.ok) {
             currentUser = username;
-            document.getElementById('currentUsername').textContent = username;
             
-            // Connect to WebSocket
-            connectWebSocket();
+            // Store username in session
+            sessionStorage.setItem('username', username);
             
-            // Show team selection
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('teamSelection').style.display = 'flex';
-            
-            // Load user's teams
-            loadUserTeams();
+            // Redirect to conversations page
+            window.location.href = 'conversations.html';
         } else {
             document.getElementById('authError').textContent = data.error || 'Login failed';
         }
@@ -335,6 +358,10 @@ function displayTeamMembers(members) {
 function leaveTeam() {
     if (!currentTeam) return;
     
+    // Just go back to conversations instead of showing team selection
+    window.location.href = 'conversations.html';
+    return;
+    
     // Notify server
     if (stompClient && stompClient.connected) {
         stompClient.send("/app/team.leave", {}, JSON.stringify({
@@ -466,10 +493,11 @@ async function logout() {
     currentTeam = null;
     teamMembers = [];
     
-    // Show login screen
-    document.getElementById('chatInterface').style.display = 'none';
-    document.getElementById('teamSelection').style.display = 'none';
-    document.getElementById('loginScreen').style.display = 'flex';
+    // Clear session storage
+    sessionStorage.clear();
+    
+    // Redirect to login page
+    window.location.href = 'team-chat-client.html';
     
     // Clear forms
     document.getElementById('username').value = '';

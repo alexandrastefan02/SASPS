@@ -96,4 +96,18 @@ public class UserService {
     public List<User> getAllUsers() {
         return userRepository.findAll();
     }
+    
+    /**
+     * Search users by username (case-insensitive partial match)
+     */
+    public List<User> searchUsers(String query) {
+        return userRepository.findByUsernameContainingIgnoreCase(query);
+    }
+    
+    /**
+     * Get user by username (returns null if not found)
+     */
+    public User getUserByUsername(String username) {
+        return userRepository.findByUsername(username).orElse(null);
+    }
 }

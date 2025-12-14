@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversations - Team Chat</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 10px;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            height: calc(100vh - 20px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        
+        .header h1 { font-size: 22px; font-weight: 600; }
+        .user-info { display: flex; align-items: center; gap: 15px; }
+        .username { font-size: 14px; font-weight: 500; }
+        
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .logout-btn:hover { background: white; color: #667eea; }
+        
+        .main-layout { flex: 1; display: flex; overflow: hidden; }
+        
+        /* LEFT SIDEBAR */
+        .sidebar {
+            width: 400px;
+            border-right: 2px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            background: #f8f9fa;
+        }
+        
+        .sidebar-header { padding: 20px; border-bottom: 2px solid #e0e0e0; background: white; }
+        .sidebar-header h2 { font-size: 18px; margin-bottom: 15px; color: #333; }
+        
+        .search-container { position: relative; margin-bottom: 12px; }
+        
+        .search-input {
+            width: 100%;
+            padding: 10px 35px 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .search-input:focus { border-color: #667eea; outline: none; }
+        
+        .search-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+        }
+        
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            margin-top: 5px;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: none;
+        }
+        
+        .search-results.show { display: block; }
+        
+        .search-result-item {
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.2s;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .search-result-item:last-child { border-bottom: none; }
+        .search-result-item:hover { background: #f8f9fa; }
+        .search-result-item .username { font-weight: 600; color: #333; font-size: 14px; }
+        
+        .online-indicator-small, .offline-indicator-small {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .online-indicator-small { background: #38a169; }
+        .offline-indicator-small { background: #999; }
+        
+        .search-empty { padding: 20px; text-align: center; color: #999; font-size: 14px; }
+        
+        .btn-team {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transition: all 0.3s;
+        }
+        
+        .btn-team:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+        
+        .conversations-list { flex: 1; overflow-y: auto; padding: 10px; }
+        
+        .conversation-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        
+        .conversation-item:hover { border-color: #667eea; transform: translateX(3px); }
+        .conversation-item.active { border-color: #667eea; background: #f0f4ff; }
+        
+        .conversation-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        
+        .conversation-title { display: flex; align-items: center; gap: 8px; flex: 1; }
+        .conversation-name { font-size: 15px; font-weight: 600; color: #333; }
+        
+        .conversation-type {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        
+        .conversation-type.team { background: #764ba2; }
+        
+        .online-indicator, .offline-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .online-indicator { background: #38a169; }
+        .offline-indicator { background: #999; }
+        
+        .conversation-time { color: #999; font-size: 11px; }
+        
+        .conversation-preview {
+            color: #666;
+            font-size: 13px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .unread-badge {
+            background: #e53e3e;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+        
+        .empty-state, .loading { padding: 40px 20px; text-align: center; color: #999; }
+        
+        /* RIGHT CHAT AREA */
+        .chat-area { flex: 1; display: flex; flex-direction: column; background: white; }
+        
+        .chat-placeholder {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: #999;
+            gap: 15px;
+        }
+        
+        .chat-placeholder h2 { font-size: 24px; }
+        .chat-placeholder p { font-size: 16px; }
+        
+        .chat-container { flex: 1; display: none; flex-direction: column; }
+        .chat-container.active { display: flex; }
+        
+        .chat-header {
+            padding: 15px 25px;
+            border-bottom: 2px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+        }
+        
+        .chat-header-info h3 { font-size: 18px; color: #333; margin-bottom: 4px; }
+        .chat-status { font-size: 12px; color: #38a169; }
+        .chat-status.offline { color: #999; }
+        
+        .chat-messages { flex: 1; overflow-y: auto; padding: 20px; background: #f8f9fa; }
+        
+        .message { display: flex; gap: 12px; margin-bottom: 20px; }
+        .message.own { flex-direction: row-reverse; }
+        
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        
+        .message.own .message-avatar { background: linear-gradient(135deg, #764ba2 0%, #667eea 100%); }
+        
+        .message-content { flex: 1; max-width: 70%; }
+        .message.own .message-content { display: flex; flex-direction: column; align-items: flex-end; }
+        
+        .message-header { display: flex; gap: 10px; margin-bottom: 4px; font-size: 12px; }
+        .message-sender { font-weight: 600; color: #333; }
+        .message-time { color: #999; }
+        
+        .message-bubble {
+            background: white;
+            padding: 12px 16px;
+            border-radius: 12px;
+            color: #333;
+            line-height: 1.4;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            word-wrap: break-word;
+        }
+        
+        .message.own .message-bubble { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        
+        .chat-input-container {
+            padding: 15px 25px;
+            border-top: 2px solid #e0e0e0;
+            display: flex;
+            gap: 12px;
+            background: white;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .chat-input:focus { border-color: #667eea; outline: none; }
+        
+        .send-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .send-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+        .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.show { display: flex; }
+        
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 450px;
+            width: 90%;
+        }
+        
+        .modal-header { font-size: 22px; margin-bottom: 20px; color: #333; font-weight: 600; }
+        
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; color: #666; font-weight: 600; font-size: 13px; }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .form-group input:focus { border-color: #667eea; outline: none; }
+        
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-secondary { background: #e0e0e0; color: #333; }
+        
+        .divider {
+            margin: 20px 0;
+            text-align: center;
+            color: #999;
+            position: relative;
+        }
+        
+        .divider::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: 1px;
+            background: #e0e0e0;
+        }
+        
+        .divider span { background: white; padding: 0 15px; position: relative; z-index: 1; font-size: 13px; }
+        
+        .error {
+            background: #fff5f5;
+            color: #c53030;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+            border: 1px solid #feb2b2;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💬 Your Conversations</h1>
+            <div class="user-info">
+                <span class="username">Logged in as <strong id="currentUsername">User</strong></span>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </div>
+        
+        <div class="main-layout">
+            <!-- LEFT SIDEBAR -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h2>Chats</h2>
+                    <div class="search-container">
+                        <input 
+                            type="text" 
+                            class="search-input" 
+                            id="userSearch" 
+                            placeholder="Search people..."
+                            oninput="searchUsers()"
+                            onfocus="showSearchResults()"
+                        >
+                        <span class="search-icon">🔍</span>
+                        <div class="search-results" id="searchResults"></div>
+                    </div>
+                    <button class="btn-team" onclick="showCreateTeamModal()">➕ Join/Create Team</button>
+                </div>
+                
+                <div class="conversations-list" id="conversationsList">
+                    <div id="loadingMessage" class="loading">Loading...</div>
+                    <div id="emptyState" class="empty-state" style="display: none;">
+                        <div>No conversations yet</div>
+                        <div style="font-size: 12px; margin-top: 8px;">Search for people or join a team!</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- RIGHT CHAT AREA -->
+            <div class="chat-area">
+                <div class="chat-placeholder" id="chatPlaceholder">
+                    <h2>👋 Welcome!</h2>
+                    <p>Select a conversation to start chatting</p>
+                    <p style="font-size: 14px; margin-top: 10px;">or search for someone to message</p>
+                </div>
+                
+                <div class="chat-container" id="chatContainer">
+                    <div class="chat-header">
+                        <div class="chat-header-info">
+                            <h3 id="chatName">Chat Name</h3>
+                            <div class="chat-status" id="chatStatus">Online</div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="loading" id="messagesLoading">Loading messages...</div>
+                    </div>
+                    
+                    <div class="chat-input-container">
+                        <input 
+                            type="text" 
+                            class="chat-input" 
+                            id="messageInput" 
+                            placeholder="Type a message..."
+                            onkeypress="handleKeyPress(event)"
+                        >
+                        <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Team Modal -->
+    <div id="teamModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Join or Create Team</div>
+            
+            <div class="form-group">
+                <label for="joinTeamName">Join Existing Team</label>
+                <input type="text" id="joinTeamName" placeholder="Enter team name...">
+            </div>
+            <button class="btn btn-primary" onclick="joinTeam()" style="width: 100%;">Join Team</button>
+            
+            <div class="divider"><span>OR</span></div>
+            
+            <div class="form-group">
+                <label for="createTeamName">Create New Team</label>
+                <input type="text" id="createTeamName" placeholder="Enter new team name...">
+            </div>
+            <button class="btn btn-primary" onclick="createTeam()" style="width: 100%;">Create Team</button>
+            
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeTeamModal()">Cancel</button>
+            </div>
+            
+            <div id="teamError" class="error" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <script src="conversations.js?v=20251214172200"></script>
+</body>
+</html>
