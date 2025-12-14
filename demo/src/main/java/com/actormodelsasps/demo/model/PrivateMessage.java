@@ -1,42 +1,37 @@
 package com.actormodelsasps.demo.model;
 
-import jakarta.persistence.*;
+import com.azure.spring.data.cosmos.core.mapping.Container;
+import com.azure.spring.data.cosmos.core.mapping.PartitionKey;
+import org.springframework.data.annotation.Id;
 import java.time.LocalDateTime;
 
 /**
  * PrivateMessage entity representing a 1-on-1 direct message between two users
  */
-@Entity
-@Table(name = "private_messages")
+@Container(containerName = "privateMessages", autoCreateContainer = false)
 public class PrivateMessage {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
     
-    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
     
-    @Column(name = "sender_id", nullable = false)
-    private Long senderId;
+    @PartitionKey
+    private String senderId;
     
-    @Column(name = "receiver_id", nullable = false)
-    private Long receiverId;
+    private String receiverId;
     
-    @Column(nullable = false)
     private LocalDateTime timestamp;
     
-    @Column(name = "is_read")
     private boolean read = false;
     
-    @Column(name = "is_delivered")
     private boolean delivered = false;
     
     public PrivateMessage() {
         this.timestamp = LocalDateTime.now();
     }
     
-    public PrivateMessage(String content, Long senderId, Long receiverId) {
+    public PrivateMessage(String content, String senderId, String receiverId) {
         this();
         this.content = content;
         this.senderId = senderId;
@@ -44,11 +39,11 @@ public class PrivateMessage {
     }
     
     // Getters and Setters
-    public Long getId() {
+    public String getId() {
         return id;
     }
     
-    public void setId(Long id) {
+    public void setId(String id) {
         this.id = id;
     }
     
@@ -60,19 +55,19 @@ public class PrivateMessage {
         this.content = content;
     }
     
-    public Long getSenderId() {
+    public String getSenderId() {
         return senderId;
     }
     
-    public void setSenderId(Long senderId) {
+    public void setSenderId(String senderId) {
         this.senderId = senderId;
     }
     
-    public Long getReceiverId() {
+    public String getReceiverId() {
         return receiverId;
     }
     
-    public void setReceiverId(Long receiverId) {
+    public void setReceiverId(String receiverId) {
         this.receiverId = receiverId;
     }
     

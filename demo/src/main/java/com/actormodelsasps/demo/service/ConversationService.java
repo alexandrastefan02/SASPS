@@ -12,7 +12,6 @@ import com.actormodelsasps.demo.repository.UserRepository;
 import com.actormodelsasps.demo.repository.TeamRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -42,12 +41,11 @@ public class ConversationService {
     /**
      * Get all conversations for a user
      */
-    @Transactional(readOnly = true)
     public List<Map<String, Object>> getUserConversations(String username) {
         User user = userRepository.findByUsername(username)
             .orElseThrow(() -> new RuntimeException("User not found"));
         
-        List<Conversation> conversations = conversationRepository.findByUserIdOrderByLastMessageTimeDesc(user.getId());
+        List<Conversation> conversations = conversationRepository.findByUserIdOrderByLastMessageTime(user.getId());
         
         return conversations.stream()
             .map(conv -> buildConversationResponse(conv))
@@ -57,8 +55,7 @@ public class ConversationService {
     /**
      * Create or update a private conversation
      */
-    @Transactional
-    public Conversation createOrUpdatePrivateConversation(Long userId, Long participantUserId, String lastMessage) {
+    public Conversation createOrUpdatePrivateConversation(String userId, String participantUserId, String lastMessage) {
         Optional<Conversation> existingConv = conversationRepository.findPrivateConversation(userId, participantUserId);
         
         Conversation conversation;
@@ -66,6 +63,7 @@ public class ConversationService {
             conversation = existingConv.get();
         } else {
             conversation = new Conversation(Conversation.ConversationType.PRIVATE, userId, participantUserId, null);
+            conversation.setId(java.util.UUID.randomUUID().toString()); // Generate UUID for Cosmos DB
         }
         
         conversation.setLastMessage(lastMessage);
@@ -77,8 +75,7 @@ public class ConversationService {
     /**
      * Create or update a team conversation
      */
-    @Transactional
-    public Conversation createOrUpdateTeamConversation(Long userId, Long teamId, String lastMessage) {
+    public Conversation createOrUpdateTeamConversation(String userId, String teamId, String lastMessage) {
         Optional<Conversation> existingConv = conversationRepository.findTeamConversation(userId, teamId);
         
         Conversation conversation;
@@ -86,6 +83,7 @@ public class ConversationService {
             conversation = existingConv.get();
         } else {
             conversation = new Conversation(Conversation.ConversationType.TEAM, userId, null, teamId);
+            conversation.setId(java.util.UUID.randomUUID().toString()); // Generate UUID for Cosmos DB
         }
         
         conversation.setLastMessage(lastMessage);
@@ -97,8 +95,7 @@ public class ConversationService {
     /**
      * Update unread count for a conversation
      */
-    @Transactional
-    public void updateUnreadCount(Long userId, Long teamId, Long participantUserId) {
+    public void updateUnreadCount(String userId, String teamId, String participantUserId) {
         Optional<Conversation> convOpt;
         
         if (teamId != null) {
@@ -113,10 +110,10 @@ public class ConversationService {
             int unreadCount;
             if (teamId != null) {
                 // Count undelivered team messages
-                unreadCount = (int) messageRepository.countByTeamIdAndDeliveredFalse(teamId);
+                unreadCount = (int) messageRepository.countUndeliveredByTeamId(teamId);
             } else {
                 // Count unread private messages
-                unreadCount = (int) privateMessageRepository.countByReceiverIdAndSenderIdAndReadFalse(userId, participantUserId);
+                unreadCount = (int) privateMessageRepository.countUnreadFromSender(userId, participantUserId);
             }
             
             conversation.setUnreadCount(unreadCount);
@@ -127,8 +124,7 @@ public class ConversationService {
     /**
      * Mark conversation as read
      */
-    @Transactional
-    public void markConversationAsRead(Long userId, Long teamId, Long participantUserId) {
+    public void markConversationAsRead(String userId, String teamId, String participantUserId) {
         Optional<Conversation> convOpt;
         
         if (teamId != null) {
@@ -171,7 +167,7 @@ public class ConversationService {
             if (team.isPresent()) {
                 response.put("teamId", team.get().getId());
                 response.put("teamName", team.get().getName());
-                response.put("memberCount", team.get().getMembers().size());
+                response.put("memberCount", team.get().getMemberIds().size());
                 response.put("name", team.get().getName());
             }
         }
@@ -182,22 +178,25 @@ public class ConversationService {
     /**
      * Sync conversations for a user (create conversation entries for their teams)
      */
-    @Transactional
     public void syncUserConversations(String username) {
         User user = userRepository.findByUsername(username)
             .orElseThrow(() -> new RuntimeException("User not found"));
         
+        // Get all teams the user is a member of
+        List<Team> userTeams = teamRepository.findTeamsByUserId(user.getId());
+        
         // Create conversation entries for all teams the user is part of
-        for (Team team : user.getTeams()) {
+        for (Team team : userTeams) {
             Optional<Conversation> existing = conversationRepository.findTeamConversation(user.getId(), team.getId());
             
             if (existing.isEmpty()) {
                 // Get last message for this team
-                List<Message> messages = messageRepository.findByTeamIdOrderByTimestampAsc(team.getId());
+                List<Message> messages = messageRepository.findByTeamIdOrderByTimestamp(team.getId());
                 String lastMessage = messages.isEmpty() ? "No messages yet" : messages.get(messages.size() - 1).getContent();
                 LocalDateTime lastMessageTime = messages.isEmpty() ? team.getCreatedAt() : messages.get(messages.size() - 1).getTimestamp();
                 
                 Conversation conversation = new Conversation(Conversation.ConversationType.TEAM, user.getId(), null, team.getId());
+                conversation.setId(java.util.UUID.randomUUID().toString()); // Generate UUID for Cosmos DB
                 conversation.setLastMessage(lastMessage);
                 conversation.setLastMessageTime(lastMessageTime);
                 conversation.setUnreadCount(0);
@@ -210,8 +209,7 @@ public class ConversationService {
     /**
      * Update private conversation by username (helper method for controllers)
      */
-    @Transactional
-    public Conversation updatePrivateConversationByUsername(String username, Long participantId, String lastMessage) {
+    public Conversation updatePrivateConversationByUsername(String username, String participantId, String lastMessage) {
         User user = userRepository.findByUsername(username)
             .orElseThrow(() -> new RuntimeException("User not found"));
         

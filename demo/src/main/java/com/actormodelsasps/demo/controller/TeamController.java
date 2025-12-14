@@ -46,7 +46,7 @@ public class TeamController {
                 "id", team.getId(),
                 "name", team.getName(),
                 "createdAt", team.getCreatedAt().toString(),
-                "memberCount", team.getMembers().size()
+                "memberCount", team.getMemberIds().size()
             ));
             
             return ResponseEntity.ok(response);
@@ -81,7 +81,7 @@ public class TeamController {
                 "id", team.getId(),
                 "name", team.getName(),
                 "createdAt", team.getCreatedAt().toString(),
-                "memberCount", team.getMembers().size()
+                "memberCount", team.getMemberIds().size()
             ));
             
             return ResponseEntity.ok(response);
@@ -102,12 +102,14 @@ public class TeamController {
             List<Team> teams = teamService.getUserTeams(username);
             
             List<Map<String, Object>> teamList = teams.stream()
-                .map(team -> Map.of(
-                    "id", (Object) team.getId(),
-                    "name", team.getName(),
-                    "createdAt", team.getCreatedAt().toString(),
-                    "memberCount", team.getMembers().size()
-                ))
+                .map(team -> {
+                    Map<String, Object> teamMap = new HashMap<>();
+                    teamMap.put("id", team.getId());
+                    teamMap.put("name", team.getName());
+                    teamMap.put("createdAt", team.getCreatedAt().toString());
+                    teamMap.put("memberCount", team.getMemberIds().size());
+                    return teamMap;
+                })
                 .collect(Collectors.toList());
             
             return ResponseEntity.ok(Map.of("teams", teamList));
@@ -121,7 +123,7 @@ public class TeamController {
      * Get all members of a team
      */
     @GetMapping("/{teamId}/members")
-    public ResponseEntity<?> getTeamMembers(@PathVariable Long teamId) {
+    public ResponseEntity<?> getTeamMembers(@PathVariable String teamId) {
         try {
             List<User> members = teamService.getTeamMembers(teamId);
             
@@ -153,7 +155,7 @@ public class TeamController {
                 "id", team.getId(),
                 "name", team.getName(),
                 "createdAt", team.getCreatedAt().toString(),
-                "memberCount", team.getMembers().size()
+                "memberCount", team.getMemberIds().size()
             );
             
             return ResponseEntity.ok(Map.of("team", teamData));
@@ -183,7 +185,7 @@ public class TeamController {
      * Get messages for a specific team
      */
     @GetMapping("/{teamId}/messages")
-    public ResponseEntity<?> getTeamMessages(@PathVariable Long teamId) {
+    public ResponseEntity<?> getTeamMessages(@PathVariable String teamId) {
         try {
             List<com.actormodelsasps.demo.model.Message> messages = teamService.getTeamMessages(teamId);
             
@@ -236,11 +238,11 @@ public class TeamController {
     
     public static class LeaveTeamRequest {
         private String username;
-        private Long teamId;
+        private String teamId;
         
         public String getUsername() { return username; }
         public void setUsername(String username) { this.username = username; }
-        public Long getTeamId() { return teamId; }
-        public void setTeamId(Long teamId) { this.teamId = teamId; }
+        public String getTeamId() { return teamId; }
+        public void setTeamId(String teamId) { this.teamId = teamId; }
     }
 }

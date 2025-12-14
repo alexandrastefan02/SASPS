@@ -1,8 +1,8 @@
 package com.actormodelsasps.demo.controller;
 
-import com.actormodelsasps.demo.model.PrivateMessage;
+import com.actormodelsasps.demo.model.Message;
 import com.actormodelsasps.demo.model.User;
-import com.actormodelsasps.demo.repository.PrivateMessageRepository;
+import com.actormodelsasps.demo.repository.MessageRepository;
 import com.actormodelsasps.demo.repository.UserRepository;
 import com.actormodelsasps.demo.service.ConversationService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +19,8 @@ import java.util.Map;
 
 /**
  * WebSocket controller for private 1-on-1 messaging
+ * 
+ * Uses the 'messages' container with teamId='private' for private messages
  */
 @Controller
 public class PrivateMessageController {
@@ -27,7 +29,7 @@ public class PrivateMessageController {
     private SimpMessagingTemplate messagingTemplate;
     
     @Autowired
-    private PrivateMessageRepository privateMessageRepository;
+    private MessageRepository messageRepository;
     
     @Autowired
     private UserRepository userRepository;
@@ -63,7 +65,7 @@ public class PrivateMessageController {
         
         String senderUsername = (String) payload.get("username");
         String content = (String) payload.get("content");
-        Long receiverId = Long.valueOf(payload.get("receiverId").toString());
+        String receiverId = payload.get("receiverId").toString();
         
         System.out.println("\n📨 ══════════ PRIVATE MESSAGE ══════════");
         System.out.println("   From: " + senderUsername);
@@ -78,11 +80,18 @@ public class PrivateMessageController {
         User receiver = userRepository.findById(receiverId)
             .orElseThrow(() -> new RuntimeException("Receiver not found"));
         
-        // Save message to database
-        PrivateMessage message = new PrivateMessage(content, sender.getId(), receiver.getId());
+        // Save message to database using Message entity with teamId='private'
+        Message message = new Message();
+        message.setId(java.util.UUID.randomUUID().toString()); // Generate UUID for Cosmos DB
+        message.setContent(content);
+        message.setSender(sender.getId());
+        message.setReceiverId(receiver.getId());
+        message.setTeamId("private"); // Use 'private' as partition key for private messages
+        message.setType(Message.MessageType.PRIVATE);
         message.setTimestamp(LocalDateTime.now());
         message.setDelivered(receiver.isOnline());
-        privateMessageRepository.save(message);
+        message.setRead(false);
+        messageRepository.save(message);
         
         System.out.println("   Saved to DB with ID: " + message.getId());
         

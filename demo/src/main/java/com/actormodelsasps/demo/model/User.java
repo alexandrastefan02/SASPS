@@ -1,10 +1,14 @@
 package com.actormodelsasps.demo.model;
 
-import jakarta.persistence.*;
+import com.azure.spring.data.cosmos.core.mapping.Container;
+import com.azure.spring.data.cosmos.core.mapping.PartitionKey;
+import org.springframework.data.annotation.Id;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * User entity representing registered users
@@ -15,31 +19,25 @@ import java.util.Set;
  * - Registration timestamp
  * - Online status for messaging
  */
-@Entity
-@Table(name = "users")
+@Container(containerName = "users", autoCreateContainer = false)
 public class User {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
     
-    @Column(unique = true, nullable = false, length = 50)
+    @PartitionKey
     private String username;
     
-    @Column(nullable = false)
     private String password;  // Will be encoded by BCrypt
     
-    @Column(name = "created_at")
     private LocalDateTime createdAt;
     
-    @Column(name = "last_seen")
     private LocalDateTime lastSeen;
     
-    @Column(name = "is_online")
     private boolean online = false;
     
-    @ManyToMany(mappedBy = "members")
-    private Set<Team> teams = new HashSet<>();
+    // Store team IDs instead of Team objects to avoid circular references
+    private List<String> teamIds = new ArrayList<>();
     
     // Default constructor
     public User() {
@@ -55,11 +53,11 @@ public class User {
     }
     
     // Getters and Setters
-    public Long getId() {
+    public String getId() {
         return id;
     }
     
-    public void setId(Long id) {
+    public void setId(String id) {
         this.id = id;
     }
     
@@ -106,12 +104,12 @@ public class User {
         }
     }
     
-    public Set<Team> getTeams() {
-        return teams;
+    public List<String> getTeamIds() {
+        return teamIds;
     }
     
-    public void setTeams(Set<Team> teams) {
-        this.teams = teams;
+    public void setTeamIds(List<String> teamIds) {
+        this.teamIds = teamIds;
     }
     
     @Override

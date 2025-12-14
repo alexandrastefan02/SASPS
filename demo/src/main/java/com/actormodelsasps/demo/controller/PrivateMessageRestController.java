@@ -1,9 +1,9 @@
 package com.actormodelsasps.demo.controller;
 
-import com.actormodelsasps.demo.model.PrivateMessage;
+import com.actormodelsasps.demo.model.Message;
 import com.actormodelsasps.demo.model.User;
-import com.actormodelsasps.demo.repository.PrivateMessageRepository;
-import com.actormodelsasps.demo.repository.UserRepository;
+import com.actormodelsasps.demo.repository.MessageRepository;
+import com.actormodelsasps.demo.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +15,8 @@ import java.util.stream.Collectors;
 
 /**
  * REST Controller for private message operations
+ * 
+ * Uses the 'messages' container with teamId='private' for private messages
  */
 @RestController
 @RequestMapping("/api/private-messages")
@@ -22,30 +24,32 @@ import java.util.stream.Collectors;
 public class PrivateMessageRestController {
     
     @Autowired
-    private PrivateMessageRepository privateMessageRepository;
+    private MessageRepository messageRepository;
     
     @Autowired
-    private UserRepository userRepository;
+    private UserService userService;
     
     /**
      * Get message history between current user and another user
+     * Uses messages container with teamId='private'
      */
     @GetMapping("/history")
-    public ResponseEntity<?> getMessageHistory(@RequestParam Long participantId,
+    public ResponseEntity<?> getMessageHistory(@RequestParam String participantId,
                                                @RequestParam(required = false) String username) {
         try {
-            // Get username from parameter (passed from frontend session)
-            if (username == null || username.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Username required"));
+            // Get current user by username parameter
+            if (username == null || username.isEmpty()) {
+                return ResponseEntity.status(401).body(Map.of("error", "Username parameter required"));
             }
             
-            User currentUser = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+            User currentUser = userService.getUserByUsername(username);
+            if (currentUser == null) {
+                return ResponseEntity.status(401).body(Map.of("error", "User not found: " + username));
+            }
             
-            // Get messages between the two users
-            List<PrivateMessage> messages = privateMessageRepository.findMessagesBetweenUsers(
-                currentUser.getId(), 
-                participantId
+            // Get private messages between current user and participant
+            List<Message> messages = messageRepository.findPrivateMessagesBetweenUsers(
+                currentUser.getId(), participantId
             );
             
             // Convert to response format
@@ -54,24 +58,15 @@ public class PrivateMessageRestController {
                     Map<String, Object> msgMap = new HashMap<>();
                     msgMap.put("id", msg.getId());
                     msgMap.put("content", msg.getContent());
-                    msgMap.put("senderId", msg.getSenderId());
+                    msgMap.put("senderId", msg.getSender());
                     msgMap.put("receiverId", msg.getReceiverId());
-                    msgMap.put("timestamp", msg.getTimestamp());
+                    msgMap.put("timestamp", msg.getTimestamp().toString());
                     msgMap.put("read", msg.isRead());
-                    msgMap.put("delivered", msg.isDelivered());
-                    
-                    // Add sender username for display
-                    User sender = userRepository.findById(msg.getSenderId()).orElse(null);
-                    if (sender != null) {
-                        msgMap.put("sender", sender.getUsername());
-                    }
-                    
                     return msgMap;
                 })
                 .collect(Collectors.toList());
             
             return ResponseEntity.ok(Map.of("success", true, "messages", messageList));
-            
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

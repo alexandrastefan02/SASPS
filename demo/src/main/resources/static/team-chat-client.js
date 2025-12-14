@@ -5,6 +5,7 @@ let stompClient = null;
 let currentUser = null;
 let currentTeam = null;
 let teamMembers = [];
+let currentSubscription = null; // Store subscription reference
 
 // ============================================================================
 // INITIALIZATION
@@ -237,6 +238,9 @@ async function createTeam() {
             document.getElementById('teamError').textContent = '';
             document.getElementById('createTeamName').value = '';
             
+            // Mark that teams changed for conversation refresh
+            localStorage.setItem('teamsChanged', 'true');
+            
             // Enter the newly created team
             setTimeout(() => {
                 enterTeam(data.team);
@@ -269,9 +273,13 @@ async function joinTeam() {
         const data = await response.json();
 
         if (response.ok) {
+            console.log('✅ Joined team:', teamName);
             document.getElementById('teamSuccess').textContent = `Joined team "${teamName}"!`;
             document.getElementById('teamError').textContent = '';
             document.getElementById('joinTeamName').value = '';
+            
+            // Mark that teams changed for conversation refresh
+            localStorage.setItem('teamsChanged', 'true');
             
             // Enter the team
             setTimeout(() => {
@@ -297,7 +305,13 @@ async function enterTeam(team) {
     document.getElementById('teamSelection').style.display = 'none';
     document.getElementById('chatInterface').style.display = 'flex';
     
-    // Subscribe to team messages
+    // Clear existing messages
+    document.getElementById('messagesContainer').innerHTML = '';
+    
+    // Load message history FIRST (before subscribing to new messages)
+    await loadTeamHistory(team.id);
+    
+    // Subscribe to team messages for real-time updates
     subscribeToTeam(team.id);
     
     // Load team members
@@ -312,15 +326,55 @@ async function enterTeam(team) {
     console.log('✅ Entered team successfully');
 }
 
+async function loadTeamHistory(teamId) {
+    try {
+        console.log('📜 Loading message history for team:', teamId);
+        
+        const response = await fetch(`http://localhost:8080/api/teams/${teamId}/messages?limit=100`);
+        const data = await response.json();
+        
+        if (response.ok && data.messages) {
+            console.log(`📜 Loaded ${data.messages.length} historical messages`);
+            
+            // Display messages in order (they come sorted from backend)
+            data.messages.forEach(message => {
+                displayMessage(message);
+            });
+        } else {
+            console.error('Failed to load message history:', data);
+        }
+    } catch (error) {
+        console.error('Error loading message history:', error);
+    }
+}
+
 function subscribeToTeam(teamId) {
+    // Unsubscribe from previous team if exists
+    if (currentSubscription) {
+        console.log('🔌 Unsubscribing from previous team');
+        currentSubscription.unsubscribe();
+        currentSubscription = null;
+    }
+    
     // Subscribe to team messages
     const messageDestination = `/user/queue/team/${teamId}/messages`;
-    stompClient.subscribe(messageDestination, function(message) {
-        const messageData = JSON.parse(message.body);
-        displayMessage(messageData);
+    console.log('📬 Subscribing to:', messageDestination);
+    
+    currentSubscription = stompClient.subscribe(messageDestination, function(message) {
+        console.log('📨 WebSocket message received!');
+        try {
+            const messageData = JSON.parse(message.body);
+            console.log('   📨 From:', messageData.sender);
+            console.log('   📨 Content:', messageData.content);
+            console.log('   📨 Timestamp:', messageData.timestamp);
+            displayMessage(messageData);
+        } catch (error) {
+            console.error('❌ Error parsing message:', error);
+        }
     });
     
-    console.log('📬 Subscribed to team messages:', messageDestination);
+    console.log('✅ Subscribed to team messages:', messageDestination);
+    console.log('   Subscription ID:', currentSubscription.id);
 }
 
 async function loadTeamMembers(teamId) {
@@ -392,6 +446,12 @@ function sendMessage() {
     const content = input.value.trim();
     
     if (!content || !currentTeam || !stompClient || !stompClient.connected) {
+        console.log('❌ Cannot send message:', {
+            hasContent: !!content,
+            hasTeam: !!currentTeam,
+            hasClient: !!stompClient,
+            isConnected: stompClient ? stompClient.connected : false
+        });
         return;
     }
     
@@ -402,7 +462,9 @@ function sendMessage() {
         type: 'CHAT'
     };
     
+    console.log('📤 Sending message:', message);
     stompClient.send("/app/team.send", {}, JSON.stringify(message));
+    console.log('✅ Message sent to server');
     
     input.value = '';
     input.focus();

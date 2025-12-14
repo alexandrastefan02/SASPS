@@ -1,6 +1,8 @@
 package com.actormodelsasps.demo.model;
 
-import jakarta.persistence.*;
+import com.azure.spring.data.cosmos.core.mapping.Container;
+import com.azure.spring.data.cosmos.core.mapping.PartitionKey;
+import org.springframework.data.annotation.Id;
 import java.time.LocalDateTime;
 
 /**
@@ -11,32 +13,28 @@ import java.time.LocalDateTime;
  * - Retrieved as conversation history
  * - Stored permanently
  */
-@Entity
-@Table(name = "messages")
+@Container(containerName = "messages", autoCreateContainer = false)
 public class Message {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
     
-    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;           // The actual message text
     
-    @Column(nullable = false)
     private String sender;            // Username of who sent it
     
-    @Column(name = "team_id", nullable = false)
-    private Long teamId;              // Which team this message belongs to
+    @PartitionKey
+    private String teamId;            // Which team this message belongs to (or "private" for private messages)
     
-    @Column(nullable = false)
+    private String receiverId;        // For private messages: ID of the receiver (null for team messages)
+    
     private LocalDateTime timestamp;   // When it was sent
     
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private MessageType type;          // Type of message
     
-    @Column(name = "is_delivered")
     private boolean delivered = false; // Has this been delivered to all recipients?
+    
+    private boolean read = false;      // For private messages: has it been read?
     
     /**
      * Message types for different events
@@ -45,7 +43,8 @@ public class Message {
         CHAT,       // Regular chat message
         JOIN,       // User joined team notification
         LEAVE,      // User left team notification
-        SYSTEM      // System message
+        SYSTEM,     // System message
+        PRIVATE     // Private 1-on-1 message
     }
     
     // Default constructor (required for JPA)
@@ -54,7 +53,7 @@ public class Message {
     }
     
     // Constructor with parameters
-    public Message(String content, String sender, Long teamId, MessageType type) {
+    public Message(String content, String sender, String teamId, MessageType type) {
         this();
         this.content = content;
         this.sender = sender;
@@ -63,11 +62,11 @@ public class Message {
     }
     
     // Getters and Setters
-    public Long getId() {
+    public String getId() {
         return id;
     }
     
-    public void setId(Long id) {
+    public void setId(String id) {
         this.id = id;
     }
     public String getContent() {
@@ -86,11 +85,11 @@ public class Message {
         this.sender = sender;
     }
     
-    public Long getTeamId() {
+    public String getTeamId() {
         return teamId;
     }
     
-    public void setTeamId(Long teamId) {
+    public void setTeamId(String teamId) {
         this.teamId = teamId;
     }
     
@@ -118,6 +117,22 @@ public class Message {
         this.delivered = delivered;
     }
     
+    public String getReceiverId() {
+        return receiverId;
+    }
+    
+    public void setReceiverId(String receiverId) {
+        this.receiverId = receiverId;
+    }
+    
+    public boolean isRead() {
+        return read;
+    }
+    
+    public void setRead(boolean read) {
+        this.read = read;
+    }
+    
     @Override
     public String toString() {
         return "Message{" +
@@ -125,9 +140,11 @@ public class Message {
                 ", content='" + content + '\'' +
                 ", sender='" + sender + '\'' +
                 ", teamId=" + teamId +
+                ", receiverId='" + receiverId + '\'' +
                 ", timestamp=" + timestamp +
                 ", type=" + type +
                 ", delivered=" + delivered +
+                ", read=" + read +
                 '}';
     }
 }

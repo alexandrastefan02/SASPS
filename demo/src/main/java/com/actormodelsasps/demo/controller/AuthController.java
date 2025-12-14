@@ -59,6 +59,8 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
+            System.out.println("🔵 Login request received for username: " + request.getUsername());
+            
             // Validate input
             if (request.getUsername() == null || request.getUsername().trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Username is required"));
@@ -80,12 +82,16 @@ public class AuthController {
                 response.put("message", "Login successful");
                 response.put("username", request.getUsername().trim());
                 
+                System.out.println("✅ Login successful for: " + request.getUsername().trim());
                 return ResponseEntity.ok(response);
             } else {
+                System.out.println("❌ Login failed - Invalid credentials for: " + request.getUsername().trim());
                 return ResponseEntity.status(401).body(Map.of("error", "Invalid username or password"));
             }
             
         } catch (Exception e) {
+            System.err.println("🔴 ERROR in login: " + e.getClass().getName() + " - " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.internalServerError().body(Map.of("error", "Login failed"));
         }
     }

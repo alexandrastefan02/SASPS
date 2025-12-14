@@ -1,46 +1,38 @@
 package com.actormodelsasps.demo.model;
 
-import jakarta.persistence.*;
+import com.azure.spring.data.cosmos.core.mapping.Container;
+import com.azure.spring.data.cosmos.core.mapping.PartitionKey;
+import org.springframework.data.annotation.Id;
 import java.time.LocalDateTime;
 
 /**
  * Conversation entity representing a chat conversation (1-on-1 or team-based)
  * This serves as an overview/summary of a conversation
  */
-@Entity
-@Table(name = "conversations")
+@Container(containerName = "conversations", autoCreateContainer = false)
 public class Conversation {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
     
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private ConversationType type;
     
     // For 1-on-1 conversations: stores the other user's ID
-    @Column(name = "participant_user_id")
-    private Long participantUserId;
+    private String participantUserId;
     
     // For team conversations: stores the team ID
-    @Column(name = "team_id")
-    private Long teamId;
+    private String teamId;
     
     // The current user who owns this conversation view
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @PartitionKey
+    private String userId;
     
-    @Column(name = "last_message")
     private String lastMessage;
     
-    @Column(name = "last_message_time")
     private LocalDateTime lastMessageTime;
     
-    @Column(name = "unread_count")
     private int unreadCount = 0;
     
-    @Column(name = "created_at")
     private LocalDateTime createdAt;
     
     public enum ConversationType {
@@ -52,7 +44,7 @@ public class Conversation {
         this.createdAt = LocalDateTime.now();
     }
     
-    public Conversation(ConversationType type, Long userId, Long participantUserId, Long teamId) {
+    public Conversation(ConversationType type, String userId, String participantUserId, String teamId) {
         this();
         this.type = type;
         this.userId = userId;
@@ -61,11 +53,11 @@ public class Conversation {
     }
     
     // Getters and Setters
-    public Long getId() {
+    public String getId() {
         return id;
     }
     
-    public void setId(Long id) {
+    public void setId(String id) {
         this.id = id;
     }
     
@@ -77,27 +69,27 @@ public class Conversation {
         this.type = type;
     }
     
-    public Long getParticipantUserId() {
+    public String getParticipantUserId() {
         return participantUserId;
     }
     
-    public void setParticipantUserId(Long participantUserId) {
+    public void setParticipantUserId(String participantUserId) {
         this.participantUserId = participantUserId;
     }
     
-    public Long getTeamId() {
+    public String getTeamId() {
         return teamId;
     }
     
-    public void setTeamId(Long teamId) {
+    public void setTeamId(String teamId) {
         this.teamId = teamId;
     }
     
-    public Long getUserId() {
+    public String getUserId() {
         return userId;
     }
     
-    public void setUserId(Long userId) {
+    public void setUserId(String userId) {
         this.userId = userId;
     }
     

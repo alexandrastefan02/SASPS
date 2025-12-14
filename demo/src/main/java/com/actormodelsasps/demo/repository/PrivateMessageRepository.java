@@ -1,8 +1,8 @@
 package com.actormodelsasps.demo.repository;
 
 import com.actormodelsasps.demo.model.PrivateMessage;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
+import com.azure.spring.data.cosmos.repository.CosmosRepository;
+import com.azure.spring.data.cosmos.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -12,39 +12,26 @@ import java.util.List;
  * Repository for PrivateMessage entity
  */
 @Repository
-public interface PrivateMessageRepository extends JpaRepository<PrivateMessage, Long> {
+public interface PrivateMessageRepository extends CosmosRepository<PrivateMessage, String> {
     
     /**
      * Find all messages between two users, ordered by timestamp
      */
-    @Query("SELECT pm FROM PrivateMessage pm WHERE " +
-           "(pm.senderId = :userId1 AND pm.receiverId = :userId2) OR " +
-           "(pm.senderId = :userId2 AND pm.receiverId = :userId1) " +
-           "ORDER BY pm.timestamp ASC")
+    @Query("SELECT * FROM c WHERE (c.senderId = @userId1 AND c.receiverId = @userId2) OR (c.senderId = @userId2 AND c.receiverId = @userId1) ORDER BY c.timestamp ASC")
     List<PrivateMessage> findMessagesBetweenUsers(
-        @Param("userId1") Long userId1, 
-        @Param("userId2") Long userId2
+        @Param("userId1") String userId1, 
+        @Param("userId2") String userId2
     );
     
     /**
      * Find unread messages for a user
      */
-    List<PrivateMessage> findByReceiverIdAndReadFalseOrderByTimestampAsc(Long receiverId);
+    @Query("SELECT * FROM c WHERE c.receiverId = @receiverId AND c.read = false ORDER BY c.timestamp ASC")
+    List<PrivateMessage> findUnreadByReceiverId(@Param("receiverId") String receiverId);
     
     /**
      * Count unread messages for a user from a specific sender
      */
-    long countByReceiverIdAndSenderIdAndReadFalse(Long receiverId, Long senderId);
-    
-    /**
-     * Find recent message between two users (for conversation list)
-     */
-    @Query("SELECT pm FROM PrivateMessage pm WHERE " +
-           "(pm.senderId = :userId1 AND pm.receiverId = :userId2) OR " +
-           "(pm.senderId = :userId2 AND pm.receiverId = :userId1) " +
-           "ORDER BY pm.timestamp DESC LIMIT 1")
-    PrivateMessage findLastMessageBetweenUsers(
-        @Param("userId1") Long userId1, 
-        @Param("userId2") Long userId2
-    );
+    @Query("SELECT VALUE COUNT(1) FROM c WHERE c.receiverId = @receiverId AND c.senderId = @senderId AND c.read = false")
+    long countUnreadFromSender(@Param("receiverId") String receiverId, @Param("senderId") String senderId);
 }

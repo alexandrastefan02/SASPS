@@ -88,7 +88,7 @@ public class TeamMessageController {
                         SimpMessageHeaderAccessor headerAccessor) {
         
         String username = (String) payload.get("username");
-        Long teamId = Long.valueOf(payload.get("teamId").toString());
+        String teamId = payload.get("teamId").toString();
         
         if (username == null || teamId == null) {
             System.err.println("❌ Join team failed: Missing username or teamId");
@@ -128,7 +128,7 @@ public class TeamMessageController {
                                SimpMessageHeaderAccessor headerAccessor) {
         
         String sender = (String) payload.get("username");
-        Long teamId = Long.valueOf(payload.get("teamId").toString());
+        String teamId = payload.get("teamId").toString();
         String content = (String) payload.get("content");
         
         System.out.println("\n💬 ══════════ TEAM MESSAGE ══════════");
@@ -165,7 +165,7 @@ public class TeamMessageController {
     public void getTeamHistory(@Payload Map<String, Object> payload,
                               SimpMessageHeaderAccessor headerAccessor) {
         
-        Long teamId = Long.valueOf(payload.get("teamId").toString());
+        String teamId = payload.get("teamId").toString();
         int limit = payload.containsKey("limit") ? 
                     Integer.parseInt(payload.get("limit").toString()) : 50;
         
@@ -203,7 +203,7 @@ public class TeamMessageController {
                          SimpMessageHeaderAccessor headerAccessor) {
         
         String username = (String) payload.get("username");
-        Long teamId = Long.valueOf(payload.get("teamId").toString());
+        String teamId = payload.get("teamId").toString();
         
         if (username == null || teamId == null) {
             return;

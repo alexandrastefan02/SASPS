@@ -7,8 +7,8 @@ import com.actormodelsasps.demo.repository.TeamRepository;
 import com.actormodelsasps.demo.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -31,7 +31,6 @@ public class TeamService {
     /**
      * Create a new team
      */
-    @Transactional
     public Team createTeam(String teamName, String creatorUsername) {
         // Check if team name already exists
         if (teamRepository.existsByName(teamName)) {
@@ -44,21 +43,25 @@ public class TeamService {
         
         // Create team
         Team team = new Team(teamName, creator.getId());
+        team.setId(java.util.UUID.randomUUID().toString()); // Generate UUID for Cosmos DB
         
         // Add creator as first member
-        team.addMember(creator);
+        team.addMemberId(creator.getId());
         
         // Save team
         Team savedTeam = teamRepository.save(team);
         
-        System.out.println("✅ Team created: " + teamName + " by " + creatorUsername);
+        // Add team to creator's teamIds list
+        creator.getTeamIds().add(savedTeam.getId());
+        userRepository.save(creator);
+        
+        System.out.println("✅ Team created: " + teamName + " by " + creatorUsername + " (teamId: " + savedTeam.getId() + ")");
         return savedTeam;
     }
     
     /**
      * Join an existing team
      */
-    @Transactional
     public Team joinTeam(String teamName, String username) {
         // Find team
         Team team = teamRepository.findByName(teamName)
@@ -69,16 +72,20 @@ public class TeamService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
         
         // Check if user is already a member
-        if (team.getMembers().contains(user)) {
+        if (team.getMemberIds().contains(user.getId())) {
             System.out.println("ℹ️ User " + username + " is already a member of team " + teamName);
             return team;
         }
         
         // Add user to team
-        team.addMember(user);
+        team.addMemberId(user.getId());
         Team savedTeam = teamRepository.save(team);
         
-        System.out.println("✅ User " + username + " joined team: " + teamName);
+        // Add team to user's teamIds list
+        user.getTeamIds().add(team.getId());
+        userRepository.save(user);
+        
+        System.out.println("✅ User " + username + " joined team: " + teamName + " (teamId: " + team.getId() + ")");
         return savedTeam;
     }
     
@@ -102,18 +109,21 @@ public class TeamService {
     /**
      * Get team by ID
      */
-    public Optional<Team> getTeamById(Long teamId) {
+    public Optional<Team> getTeamById(String teamId) {
         return teamRepository.findById(teamId);
     }
     
     /**
      * Get all members of a team
      */
-    public List<User> getTeamMembers(Long teamId) {
+    public List<User> getTeamMembers(String teamId) {
         Team team = teamRepository.findById(teamId)
                 .orElseThrow(() -> new RuntimeException("Team not found with ID: " + teamId));
         
-        return team.getMembers().stream()
+        return team.getMemberIds().stream()
+                .map(memberId -> userRepository.findById(memberId))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
                 .collect(Collectors.toList());
     }
     
@@ -124,35 +134,37 @@ public class TeamService {
         Team team = teamRepository.findByName(teamName)
                 .orElseThrow(() -> new RuntimeException("Team not found: " + teamName));
         
-        return team.getMembers().stream()
+        return team.getMemberIds().stream()
+                .map(memberId -> userRepository.findById(memberId))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
                 .collect(Collectors.toList());
     }
     
     /**
      * Check if user is a member of a team
      */
-    public boolean isUserMemberOfTeam(String username, Long teamId) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found: " + username));
-        
-        Team team = teamRepository.findByIdWithMembers(teamId)
-                .orElseThrow(() -> new RuntimeException("Team not found with ID: " + teamId));
-        
-        return team.getMembers().contains(user);
-    }
-    
-    /**
-     * Leave a team
-     */
-    @Transactional
-    public void leaveTeam(String username, Long teamId) {
+    public boolean isUserMemberOfTeam(String username, String teamId) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found: " + username));
         
         Team team = teamRepository.findById(teamId)
                 .orElseThrow(() -> new RuntimeException("Team not found with ID: " + teamId));
         
-        team.removeMember(user);
+        return team.getMemberIds().contains(user.getId());
+    }
+    
+    /**
+     * Leave a team
+     */
+    public void leaveTeam(String username, String teamId) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+        
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("Team not found with ID: " + teamId));
+        
+        team.removeMemberId(user.getId());
         teamRepository.save(team);
         
         System.out.println("👋 User " + username + " left team: " + team.getName());
@@ -162,19 +174,21 @@ public class TeamService {
      * Get all teams (for admin/debugging)
      */
     public List<Team> getAllTeams() {
-        return teamRepository.findAll();
+        List<Team> teams = new ArrayList<>();
+        teamRepository.findAll().forEach(teams::add);
+        return teams;
     }
     
     /**
      * Get all messages for a team
      */
-    public List<com.actormodelsasps.demo.model.Message> getTeamMessages(Long teamId) {
+    public List<com.actormodelsasps.demo.model.Message> getTeamMessages(String teamId) {
         // Verify team exists
         teamRepository.findById(teamId)
                 .orElseThrow(() -> new RuntimeException("Team not found with ID: " + teamId));
         
         // Get all messages for team, filtering for CHAT type only (exclude SYSTEM messages)
-        return messageRepository.findByTeamIdOrderByTimestampAsc(teamId).stream()
+        return messageRepository.findByTeamIdOrderByTimestamp(teamId).stream()
                 .filter(msg -> msg.getType() == com.actormodelsasps.demo.model.Message.MessageType.CHAT)
                 .collect(Collectors.toList());
     }

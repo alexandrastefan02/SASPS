@@ -1,9 +1,11 @@
 package com.actormodelsasps.demo.model;
 
-import jakarta.persistence.*;
+import com.azure.spring.data.cosmos.core.mapping.Container;
+import com.azure.spring.data.cosmos.core.mapping.PartitionKey;
+import org.springframework.data.annotation.Id;
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Team entity representing a team/group chat room
@@ -11,30 +13,21 @@ import java.util.Set;
  * Teams are created by users and other users can join them.
  * All members in a team can see and message each other.
  */
-@Entity
-@Table(name = "teams")
+@Container(containerName = "teams", autoCreateContainer = false)
 public class Team {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
     
-    @Column(unique = true, nullable = false, length = 100)
+    @PartitionKey
     private String name;
     
-    @Column(name = "created_at")
     private LocalDateTime createdAt;
     
-    @Column(name = "owner_id")
-    private Long ownerId;  // User who created the team
+    private String ownerId;  // User who created the team
     
-    @ManyToMany
-    @JoinTable(
-        name = "team_members",
-        joinColumns = @JoinColumn(name = "team_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
-    )
-    private Set<User> members = new HashSet<>();
+    // Store member IDs instead of User objects
+    private List<String> memberIds = new ArrayList<>();
     
     // Default constructor
     public Team() {
@@ -42,18 +35,18 @@ public class Team {
     }
     
     // Constructor
-    public Team(String name, Long ownerId) {
+    public Team(String name, String ownerId) {
         this();
         this.name = name;
         this.ownerId = ownerId;
     }
     
     // Getters and Setters
-    public Long getId() {
+    public String getId() {
         return id;
     }
     
-    public void setId(Long id) {
+    public void setId(String id) {
         this.id = id;
     }
     
@@ -73,28 +66,30 @@ public class Team {
         this.createdAt = createdAt;
     }
     
-    public Long getOwnerId() {
+    public String getOwnerId() {
         return ownerId;
     }
     
-    public void setOwnerId(Long ownerId) {
+    public void setOwnerId(String ownerId) {
         this.ownerId = ownerId;
     }
     
-    public Set<User> getMembers() {
-        return members;
+    public List<String> getMemberIds() {
+        return memberIds;
     }
     
-    public void setMembers(Set<User> members) {
-        this.members = members;
+    public void setMemberIds(List<String> memberIds) {
+        this.memberIds = memberIds;
     }
     
-    public void addMember(User user) {
-        this.members.add(user);
+    public void addMemberId(String userId) {
+        if (!this.memberIds.contains(userId)) {
+            this.memberIds.add(userId);
+        }
     }
     
-    public void removeMember(User user) {
-        this.members.remove(user);
+    public void removeMemberId(String userId) {
+        this.memberIds.remove(userId);
     }
     
     @Override
@@ -103,7 +98,7 @@ public class Team {
                 "id=" + id +
                 ", name='" + name + '\'' +
                 ", ownerId=" + ownerId +
-                ", memberCount=" + members.size() +
+                ", memberCount=" + memberIds.size() +
                 ", createdAt=" + createdAt +
                 '}';
     }

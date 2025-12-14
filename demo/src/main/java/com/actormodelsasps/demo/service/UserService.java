@@ -7,6 +7,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,6 +34,7 @@ public class UserService {
         
         // Create new user with encoded password
         User user = new User();
+        user.setId(java.util.UUID.randomUUID().toString()); // Generate UUID for Cosmos DB
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(password));
         user.setCreatedAt(LocalDateTime.now());
@@ -48,10 +50,11 @@ public class UserService {
      * Authenticate user with username and password
      */
     public boolean authenticateUser(String username, String password) {
-        Optional<User> userOpt = userRepository.findByUsername(username);
+        // Use findByUsernameQuery which properly handles Cosmos DB query results as List
+        List<User> users = userRepository.findByUsernameQuery(username);
         
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
+        if (!users.isEmpty()) {
+            User user = users.get(0);
             boolean matches = passwordEncoder.matches(password, user.getPassword());
             System.out.println("🔐 Authentication attempt for " + username + ": " + (matches ? "SUCCESS" : "FAILED"));
             return matches;
@@ -65,6 +68,7 @@ public class UserService {
      * Get user by username
      */
     public Optional<User> findByUsername(String username) {
+        // Use the default method in repository which handles the List conversion
         return userRepository.findByUsername(username);
     }
     
@@ -72,9 +76,10 @@ public class UserService {
      * Set user online status
      */
     public void setUserOnline(String username, boolean online) {
-        Optional<User> userOpt = userRepository.findByUsername(username);
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
+        // Use findByUsernameQuery which properly handles Cosmos DB query results as List
+        List<User> users = userRepository.findByUsernameQuery(username);
+        if (!users.isEmpty()) {
+            User user = users.get(0);
             user.setOnline(online);
             user.setLastSeen(LocalDateTime.now());
             userRepository.save(user);
@@ -87,21 +92,23 @@ public class UserService {
      * Get all online users
      */
     public List<User> getOnlineUsers() {
-        return userRepository.findByOnlineTrue();
+        return userRepository.findByOnline(true);
     }
     
     /**
      * Get all users (for contact list - in real app this would be filtered by relationships)
      */
     public List<User> getAllUsers() {
-        return userRepository.findAll();
+        List<User> users = new ArrayList<>();
+        userRepository.findAll().forEach(users::add);
+        return users;
     }
     
     /**
      * Search users by username (case-insensitive partial match)
      */
     public List<User> searchUsers(String query) {
-        return userRepository.findByUsernameContainingIgnoreCase(query);
+        return userRepository.findByUsernameContaining(query.toLowerCase());
     }
     
     /**
@@ -109,5 +116,15 @@ public class UserService {
      */
     public User getUserByUsername(String username) {
         return userRepository.findByUsername(username).orElse(null);
+    }
+    
+    /**
+     * Get current authenticated user from session context
+     * Note: In a real application, this would get the user from SecurityContext
+     */
+    public User getCurrentUser() {
+        // For now, return null - this should be implemented with proper session management
+        // The controller will handle authentication via username parameter
+        return null;
     }
 }

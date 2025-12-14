@@ -7,7 +7,6 @@ import com.actormodelsasps.demo.repository.MessageRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -37,7 +36,7 @@ public class TeamMessageService {
     private final Map<String, String> userSessions = new ConcurrentHashMap<>();
     
     // Store user's current team (username -> teamId)
-    private final Map<String, Long> userCurrentTeam = new ConcurrentHashMap<>();
+    private final Map<String, String> userCurrentTeam = new ConcurrentHashMap<>();
     
     /**
      * Register user session
@@ -59,7 +58,7 @@ public class TeamMessageService {
     /**
      * Set user's current active team
      */
-    public void setUserCurrentTeam(String username, Long teamId) {
+    public void setUserCurrentTeam(String username, String teamId) {
         userCurrentTeam.put(username, teamId);
         System.out.println("🏢 User " + username + " switched to team ID: " + teamId);
     }
@@ -67,15 +66,14 @@ public class TeamMessageService {
     /**
      * Get user's current team
      */
-    public Long getUserCurrentTeam(String username) {
+    public String getUserCurrentTeam(String username) {
         return userCurrentTeam.get(username);
     }
     
     /**
      * Send message to team (broadcast to all members)
      */
-    @Transactional
-    public Message sendTeamMessage(String sender, Long teamId, String content) {
+    public Message sendTeamMessage(String sender, String teamId, String content) {
         try {
             // Verify user is member of team
             if (!teamService.isUserMemberOfTeam(sender, teamId)) {
@@ -85,6 +83,7 @@ public class TeamMessageService {
             
             // Create and save message
             Message message = new Message();
+            message.setId(java.util.UUID.randomUUID().toString()); // Generate UUID for Cosmos DB
             message.setSender(sender);
             message.setTeamId(teamId);
             message.setContent(content);
@@ -132,7 +131,7 @@ public class TeamMessageService {
     /**
      * Deliver undelivered messages to user when they come online
      */
-    public void deliverPendingMessages(String username, Long teamId) {
+    public void deliverPendingMessages(String username, String teamId) {
         try {
             // Check if user is online
             if (!userSessions.containsKey(username)) {
@@ -141,7 +140,7 @@ public class TeamMessageService {
             
             // Get undelivered messages for this team
             List<Message> undeliveredMessages = messageRepository
-                    .findByTeamIdAndDeliveredFalseOrderByTimestampAsc(teamId);
+                    .findUndeliveredByTeamId(teamId);
             
             if (undeliveredMessages.isEmpty()) {
                 System.out.println("📭 No pending messages for " + username + " in team " + teamId);
@@ -165,15 +164,16 @@ public class TeamMessageService {
     /**
      * Get conversation history for a team
      */
-    public List<Message> getTeamHistory(Long teamId, int limit) {
-        if (limit <= 0) {
-            return messageRepository.findByTeamIdOrderByTimestampAsc(teamId);
-        } else {
-            List<Message> messages = messageRepository.findRecentMessagesByTeamId(teamId, limit);
-            // Reverse to get chronological order (oldest first)
-            Collections.reverse(messages);
-            return messages;
+    public List<Message> getTeamHistory(String teamId, int limit) {
+        // Get all messages and sort by timestamp
+        List<Message> messages = messageRepository.findByTeamIdOrderByTimestamp(teamId);
+        
+        if (limit > 0 && messages.size() > limit) {
+            // Return only the most recent messages
+            return messages.subList(Math.max(0, messages.size() - limit), messages.size());
         }
+        
+        return messages;
     }
     
     /**
@@ -193,7 +193,7 @@ public class TeamMessageService {
     /**
      * Get online users in a specific team
      */
-    public List<String> getOnlineTeamMembers(Long teamId) {
+    public List<String> getOnlineTeamMembers(String teamId) {
         List<User> teamMembers = teamService.getTeamMembers(teamId);
         
         return teamMembers.stream()
@@ -205,9 +205,9 @@ public class TeamMessageService {
     /**
      * Broadcast system message (user joined/left team)
      */
-    @Transactional
-    public void sendSystemMessage(Long teamId, String content, Message.MessageType type) {
+    public void sendSystemMessage(String teamId, String content, Message.MessageType type) {
         Message message = new Message();
+        message.setId(java.util.UUID.randomUUID().toString()); // Generate UUID for Cosmos DB
         message.setSender("System");
         message.setTeamId(teamId);
         message.setContent(content);

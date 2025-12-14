@@ -95,18 +95,14 @@ function setupEventListeners() {
         console.log('📬 Processing received message:', message);
         console.log('   Current chat:', AppState.currentChat);
         
-        // Don't display our own sent messages again (they're already shown optimistically)
-        // Use == to handle type coercion (string vs number)
-        const isOwnMessage = message.senderId == AppState.currentUserId;
-        console.log('   Is own message?', isOwnMessage, '(senderId:', message.senderId, 'currentUserId:', AppState.currentUserId, ')');
-        
         updateConversationWithMessage(message);
         
-        if (isMessageForCurrentChat(message) && !isOwnMessage) {
-            console.log('✅ Message is for current chat (from other user), displaying...');
+        // Display message if it's for the current chat (no optimistic updates, display all messages)
+        const shouldDisplay = isMessageForCurrentChat(message);
+        
+        if (shouldDisplay) {
+            console.log('✅ Message is for current chat, displaying...');
             displayMessageInChat(message);
-        } else if (isOwnMessage) {
-            console.log('⏭️ Skipping own message (already displayed when sent)');
         } else {
             console.log('⚠️ Message is NOT for current chat');
         }
@@ -173,31 +169,8 @@ async function connectWebSocket() {
                 EventBus.emit('message:received', messageData);
             });
             
-            // Subscribe to team messages for all teams the user is in
-            console.log('🔔 Setting up team message subscriptions...');
-            fetch(`http://localhost:8080/api/teams/user/${AppState.currentUser}`)
-                .then(response => response.json())
-                .then(data => {
-                    // Handle both array response and object with teams property
-                    const teams = Array.isArray(data) ? data : (data.teams || []);
-                    console.log(`🔔 Found ${teams.length} teams for user ${AppState.currentUser}`);
-                    teams.forEach(team => {
-                        const teamQueue = `/user/queue/team/${team.id}/messages`;
-                        console.log(`🔔 Subscribing to ${teamQueue} for team: ${team.name}`);
-                        AppState.stompClient.subscribe(teamQueue, (message) => {
-                            console.log('📨 RAW WebSocket message received (team):', message);
-                            console.log('📨 Message body:', message.body);
-                            const messageData = JSON.parse(message.body);
-                            messageData.type = 'TEAM';
-                            messageData.teamId = team.id;
-                            console.log('📨 Parsed team message:', messageData);
-                            EventBus.emit('message:received', messageData);
-                        });
-                    });
-                })
-                .catch(error => {
-                    console.error('❌ Failed to subscribe to team messages:', error);
-                });
+            // Team subscriptions are handled per-chat when opening a team
+            // No need for global team subscriptions here
             
             // Subscribe to user status updates
             AppState.stompClient.subscribe(`/topic/user.status`, (message) => {
@@ -243,6 +216,14 @@ async function fetchCurrentUserId() {
 async function loadConversations(clearExisting = true) {
     try {
         console.log('📥 Loading conversations from server...');
+        
+        // Check if teams changed (from team page)
+        if (localStorage.getItem('teamsChanged') === 'true') {
+            console.log('   🔄 Teams changed detected, forcing refresh');
+            clearExisting = true;
+            localStorage.removeItem('teamsChanged');
+        }
+        
         const response = await fetch(`http://localhost:8080/api/conversations/user/${AppState.currentUser}`);
         const data = await response.json();
         
@@ -410,26 +391,30 @@ async function updateConversationWithMessage(message) {
     let conversationId = null;
     let otherUserId = null;
     
-    if (message.type === 'PRIVATE' || message.senderId) {
-        const senderId = Number(message.senderId);
-        const receiverId = Number(message.receiverId);
-        otherUserId = senderId === AppState.currentUserId ? receiverId : senderId;
-        
-        console.log('   Looking for conversation with user ID:', otherUserId);
-        
-        // Find existing private conversation
+    if (message.type === 'TEAM') {
+        // Find team conversation
+        console.log('   Looking for TEAM conversation with teamId:', message.teamId);
         for (const [id, conv] of AppState.conversations) {
-            if (conv.type === 'PRIVATE' && Number(conv.participantId) === otherUserId) {
+            if (conv.type === 'TEAM' && String(conv.teamId) === String(message.teamId)) {
                 conversationId = id;
-                console.log('   Found existing conversation:', id);
+                console.log('   Found existing team conversation:', id);
                 break;
             }
         }
-    } else if (message.type === 'TEAM') {
-        // Find team conversation
+    } else if (message.type === 'PRIVATE') {
+        // UUIDs are strings, compare them as strings
+        const senderId = String(message.senderId);
+        const receiverId = String(message.receiverId);
+        const myUserId = String(AppState.currentUserId);
+        otherUserId = senderId === myUserId ? receiverId : senderId;
+        
+        console.log('   Looking for PRIVATE conversation with user ID:', otherUserId);
+        
+        // Find existing private conversation
         for (const [id, conv] of AppState.conversations) {
-            if (conv.type === 'TEAM' && Number(conv.teamId) === Number(message.teamId)) {
+            if (conv.type === 'PRIVATE' && String(conv.participantId) === otherUserId) {
                 conversationId = id;
+                console.log('   Found existing conversation:', id);
                 break;
             }
         }
@@ -625,14 +610,52 @@ function displayMessageInChat(message, scroll = true) {
     if (empty) empty.remove();
     if (loading) loading.remove();
     
+    // Check if message already exists (prevent duplicates)
+    const messageId = message.id;
+    if (messageId) {
+        const existingMessage = container.querySelector(`[data-message-id="${messageId}"]`);
+        if (existingMessage) {
+            console.log('⏭️ Message already displayed (by ID), skipping:', messageId);
+            return;
+        }
+    }
+    
+    // Additional duplicate check: same content + sender within 2 seconds
+    // This handles cases where optimistic updates don't have IDs yet
+    const timestamp = message.timestamp || new Date().toISOString();
+    const messageTime = new Date(timestamp).getTime();
+    const content = message.content;
+    const sender = message.sender || message.senderId;
+    
+    const existingMessages = Array.from(container.querySelectorAll('.message'));
+    for (const existingMsg of existingMessages) {
+        const existingTimestamp = existingMsg.getAttribute('data-timestamp');
+        const existingContent = existingMsg.getAttribute('data-content');
+        const existingSender = existingMsg.getAttribute('data-sender');
+        
+        if (existingTimestamp && existingContent && existingSender) {
+            const existingTime = new Date(existingTimestamp).getTime();
+            const timeDiff = Math.abs(messageTime - existingTime);
+            
+            // If same sender, same content, and within 2 seconds - it's a duplicate
+            if (existingSender === String(sender) && 
+                existingContent === content && 
+                timeDiff < 2000) {
+                console.log('⏭️ Message already displayed (by content), skipping duplicate');
+                return;
+            }
+        }
+    }
+    
     const messageDiv = document.createElement('div');
     
     let isOwn = false;
     let senderName = '';
     
     if (AppState.currentChat.type === 'PRIVATE') {
-        const senderId = Number(message.senderId);
-        isOwn = senderId === AppState.currentUserId || message.sender === AppState.currentUser;
+        // UUIDs are strings, compare them as strings
+        const senderId = String(message.senderId);
+        isOwn = senderId === String(AppState.currentUserId) || message.sender === AppState.currentUser;
         senderName = isOwn ? AppState.currentUser : AppState.currentChat.participantUsername;
     } else {
         isOwn = message.sender === AppState.currentUser;
@@ -640,9 +663,17 @@ function displayMessageInChat(message, scroll = true) {
     }
     
     messageDiv.className = `message ${isOwn ? 'own' : ''}`;
+    if (messageId) {
+        messageDiv.setAttribute('data-message-id', messageId);
+    }
+    
+    // Store metadata for duplicate detection and sorting
+    messageDiv.setAttribute('data-timestamp', timestamp);
+    messageDiv.setAttribute('data-content', content);
+    messageDiv.setAttribute('data-sender', String(sender));
     
     const initials = senderName.substring(0, 2).toUpperCase();
-    const time = formatTime(message.timestamp);
+    const time = formatTime(timestamp);
     
     messageDiv.innerHTML = `
         <div class="message-avatar">${initials}</div>
@@ -655,7 +686,25 @@ function displayMessageInChat(message, scroll = true) {
         </div>
     `;
     
-    container.appendChild(messageDiv);
+    // Insert message in correct chronological position
+    const messages = Array.from(container.querySelectorAll('.message'));
+    let inserted = false;
+    
+    for (let i = 0; i < messages.length; i++) {
+        const existingTimestamp = messages[i].getAttribute('data-timestamp');
+        if (existingTimestamp && timestamp < existingTimestamp) {
+            container.insertBefore(messageDiv, messages[i]);
+            inserted = true;
+            console.log('📌 Message inserted at position', i, 'based on timestamp');
+            break;
+        }
+    }
+    
+    // If not inserted (newest message), append at the end
+    if (!inserted) {
+        container.appendChild(messageDiv);
+        console.log('📌 Message appended at the end (newest)');
+    }
     
     if (scroll) {
         scrollToBottom();
@@ -671,10 +720,11 @@ function isMessageForCurrentChat(message) {
     }
     
     if (message.type === 'PRIVATE' && AppState.currentChat.type === 'PRIVATE') {
-        const senderId = Number(message.senderId);
-        const receiverId = Number(message.receiverId);
-        const participantId = Number(AppState.currentChat.participantUserId);
-        const myUserId = Number(AppState.currentUserId);
+        // UUIDs are strings, compare them as strings
+        const senderId = String(message.senderId);
+        const receiverId = String(message.receiverId);
+        const participantId = String(AppState.currentChat.participantUserId);
+        const myUserId = String(AppState.currentUserId);
         
         console.log('   📊 Checking if message for current chat:');
         console.log('      Message senderId:', senderId, 'receiverId:', receiverId);
@@ -692,7 +742,12 @@ function isMessageForCurrentChat(message) {
     }
     
     if (message.type === 'TEAM' && AppState.currentChat.type === 'TEAM') {
-        return Number(message.teamId) === Number(AppState.currentChat.teamId);
+        // Chat ID is 'team-{teamId}', extract teamId from it
+        const currentTeamId = AppState.currentChat.id.replace('team-', '');
+        const messageTeamId = String(message.teamId);
+        const matches = currentTeamId === messageTeamId;
+        console.log('   📊 Team chat check: currentTeamId:', currentTeamId, 'messageTeamId:', messageTeamId, 'matches:', matches);
+        return matches;
     }
     
     console.log('   Type mismatch or other issue');
@@ -711,7 +766,11 @@ function subscribeToTeam(teamId) {
     AppState.currentTeamSubscription = AppState.stompClient.subscribe(destination, (message) => {
         const messageData = JSON.parse(message.body);
         messageData.type = 'TEAM';
-        console.log('📨 Team message received');
+        messageData.teamId = teamId;
+        // Extract senderId from sender username by fetching user info
+        // For now, use sender username as senderId for own message detection
+        messageData.senderId = messageData.sender;
+        console.log('📨 Team message received:', messageData);
         EventBus.emit('message:received', messageData);
     });
 }
@@ -748,26 +807,8 @@ function sendPrivateMessage(content) {
     console.log('📤 Sending private message to user ID:', AppState.currentChat.participantUserId);
     AppState.stompClient.send("/app/private.send", {}, JSON.stringify(message));
     
-    // Immediately display the sent message in UI (optimistic update)
-    const optimisticMessage = {
-        senderId: AppState.currentUserId,
-        receiverId: AppState.currentChat.participantUserId,
-        content: content,
-        timestamp: new Date().toISOString(),
-        sender: AppState.currentUser
-    };
-    displayMessageInChat(optimisticMessage, true);
-    
-    // Update conversation list with new message
-    if (AppState.currentChat && AppState.currentChat.id) {
-        const conv = AppState.conversations.get(AppState.currentChat.id);
-        if (conv) {
-            conv.lastMessage = content.substring(0, 100);
-            conv.lastMessageTime = new Date().toISOString();
-            AppState.conversations.set(AppState.currentChat.id, conv);
-            EventBus.emit('conversations:updated');
-        }
-    }
+    // Note: Removed optimistic update - we'll wait for WebSocket echo
+    // This prevents duplicate messages and ensures correct server timestamps
 }
 
 function sendTeamMessage(content) {
