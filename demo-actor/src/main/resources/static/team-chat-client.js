@@ -1,0 +1,595 @@
+// Team Chat Client - WebSocket communication for team-based messaging
+
+// Global state
+let stompClient = null;
+let currentUser = null;
+let currentTeam = null;
+let teamMembers = [];
+let currentSubscription = null; // Store subscription reference
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if coming from conversations page
+    const urlParams = new URLSearchParams(window.location.search);
+    const skipLogin = urlParams.get('skipLogin');
+    
+    if (skipLogin === 'true') {
+        // User is coming from conversations, auto-login
+        currentUser = sessionStorage.getItem('username');
+        const teamId = sessionStorage.getItem('teamId');
+        const teamName = sessionStorage.getItem('teamName');
+        
+        if (currentUser && teamId && teamName) {
+            document.getElementById('currentUsername').textContent = currentUser;
+            
+            // Connect WebSocket
+            connectWebSocket();
+            
+            // Enter team directly
+            enterTeam({ id: parseInt(teamId), name: teamName });
+            return;
+        }
+    }
+});
+
+// ============================================================================
+// AUTHENTICATION
+// ============================================================================
+
+function showLogin() {
+    document.getElementById('loginFormContent').classList.remove('hidden');
+    document.getElementById('registerFormContent').classList.add('hidden');
+    clearAuthMessages();
+}
+
+function showRegister() {
+    document.getElementById('loginFormContent').classList.add('hidden');
+    document.getElementById('registerFormContent').classList.remove('hidden');
+    clearAuthMessages();
+}
+
+function clearAuthMessages() {
+    document.getElementById('authError').textContent = '';
+    document.getElementById('authSuccess').textContent = '';
+}
+
+function clearTeamMessages() {
+    document.getElementById('teamError').textContent = '';
+    document.getElementById('teamSuccess').textContent = '';
+}
+
+async function register() {
+    const username = document.getElementById('regUsername').value.trim();
+    const password = document.getElementById('regPassword').value;
+
+    if (!username || !password) {
+        document.getElementById('authError').textContent = 'Please fill in all fields';
+        return;
+    }
+
+    if (password.length < 3) {
+        document.getElementById('authError').textContent = 'Password must be at least 3 characters';
+        return;
+    }
+
+    try {
+        const response = await fetch('http://localhost:8080/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('authSuccess').textContent = 'Account created! You can now login.';
+            document.getElementById('authError').textContent = '';
+            document.getElementById('regUsername').value = '';
+            document.getElementById('regPassword').value = '';
+            
+            setTimeout(() => {
+                showLogin();
+                document.getElementById('username').value = username;
+            }, 1500);
+        } else {
+            document.getElementById('authError').textContent = data.error || 'Registration failed';
+            document.getElementById('authSuccess').textContent = '';
+        }
+    } catch (error) {
+        document.getElementById('authError').textContent = 'Network error. Please try again.';
+        console.error('Registration error:', error);
+    }
+}
+
+async function login() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    if (!username || !password) {
+        document.getElementById('authError').textContent = 'Please enter username and password';
+        return;
+    }
+
+    try {
+        const response = await fetch('http://localhost:8080/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            currentUser = username;
+            
+            // Store username in session
+            sessionStorage.setItem('username', username);
+            
+            // Redirect to conversations page
+            window.location.href = 'conversations.html';
+        } else {
+            document.getElementById('authError').textContent = data.error || 'Login failed';
+        }
+    } catch (error) {
+        document.getElementById('authError').textContent = 'Network error. Please try again.';
+        console.error('Login error:', error);
+    }
+}
+
+// ============================================================================
+// WEBSOCKET CONNECTION
+// ============================================================================
+
+function connectWebSocket() {
+    console.log('🔌 Connecting to WebSocket...');
+    updateConnectionStatus('Connecting...', false);
+    
+    const socket = new SockJS('http://localhost:8080/ws');
+    stompClient = Stomp.over(socket);
+    
+    // Disable debug logging
+    stompClient.debug = null;
+    
+    stompClient.connect({}, onConnected, onError);
+}
+
+function onConnected() {
+    console.log('✅ WebSocket connected');
+    updateConnectionStatus('Connected', true);
+    
+    // Register user for team messaging
+    stompClient.send("/app/team.register", {}, JSON.stringify({
+        username: currentUser
+    }));
+    
+    console.log('📝 User registered for team messaging');
+}
+
+function onError(error) {
+    console.error('❌ WebSocket error:', error);
+    updateConnectionStatus('Disconnected', false);
+}
+
+function updateConnectionStatus(text, isConnected) {
+    const statusEl = document.getElementById('connectionStatus');
+    if (statusEl) {
+        statusEl.textContent = text;
+        statusEl.className = 'connection-status ' + (isConnected ? 'connected' : 'disconnected');
+    }
+}
+
+// ============================================================================
+// TEAM MANAGEMENT
+// ============================================================================
+
+async function loadUserTeams() {
+    try {
+        const response = await fetch(`http://localhost:8080/api/teams/user/${currentUser}`);
+        const data = await response.json();
+
+        if (response.ok && data.teams && data.teams.length > 0) {
+            displayUserTeams(data.teams);
+        } else {
+            document.getElementById('myTeamsList').innerHTML = '<p style="color: #999; text-align: center;">No teams yet</p>';
+        }
+    } catch (error) {
+        console.error('Error loading teams:', error);
+    }
+}
+
+function displayUserTeams(teams) {
+    const container = document.getElementById('myTeamsList');
+    container.innerHTML = '';
+    
+    teams.forEach(team => {
+        const teamDiv = document.createElement('div');
+        teamDiv.className = 'team-item';
+        teamDiv.onclick = () => enterTeam(team);
+        teamDiv.innerHTML = `
+            <h4>${team.name}</h4>
+            <p>${team.memberCount} member${team.memberCount !== 1 ? 's' : ''}</p>
+        `;
+        container.appendChild(teamDiv);
+    });
+}
+
+async function createTeam() {
+    const teamName = document.getElementById('createTeamName').value.trim();
+
+    if (!teamName) {
+        document.getElementById('teamError').textContent = 'Please enter a team name';
+        return;
+    }
+
+    try {
+        const response = await fetch('http://localhost:8080/api/teams/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ teamName, username: currentUser })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('teamSuccess').textContent = `Team "${teamName}" created!`;
+            document.getElementById('teamError').textContent = '';
+            document.getElementById('createTeamName').value = '';
+            
+            // Mark that teams changed for conversation refresh
+            localStorage.setItem('teamsChanged', 'true');
+            
+            // Enter the newly created team
+            setTimeout(() => {
+                enterTeam(data.team);
+            }, 1000);
+        } else {
+            document.getElementById('teamError').textContent = data.error || 'Failed to create team';
+            document.getElementById('teamSuccess').textContent = '';
+        }
+    } catch (error) {
+        document.getElementById('teamError').textContent = 'Network error. Please try again.';
+        console.error('Create team error:', error);
+    }
+}
+
+async function joinTeam() {
+    const teamName = document.getElementById('joinTeamName').value.trim();
+
+    if (!teamName) {
+        document.getElementById('teamError').textContent = 'Please enter a team name';
+        return;
+    }
+
+    try {
+        const response = await fetch('http://localhost:8080/api/teams/join', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ teamName, username: currentUser })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            console.log('✅ Joined team:', teamName);
+            document.getElementById('teamSuccess').textContent = `Joined team "${teamName}"!`;
+            document.getElementById('teamError').textContent = '';
+            document.getElementById('joinTeamName').value = '';
+            
+            // Mark that teams changed for conversation refresh
+            localStorage.setItem('teamsChanged', 'true');
+            
+            // Enter the team
+            setTimeout(() => {
+                enterTeam(data.team);
+            }, 1000);
+        } else {
+            document.getElementById('teamError').textContent = data.error || 'Failed to join team';
+            document.getElementById('teamSuccess').textContent = '';
+        }
+    } catch (error) {
+        document.getElementById('teamError').textContent = 'Network error. Please try again.';
+        console.error('Join team error:', error);
+    }
+}
+
+async function enterTeam(team) {
+    currentTeam = team;
+    
+    console.log('🏢 Entering team:', team.name, '(ID:', team.id, ')');
+    
+    // Update UI
+    document.getElementById('currentTeamName').textContent = team.name;
+    document.getElementById('teamSelection').style.display = 'none';
+    document.getElementById('chatInterface').style.display = 'flex';
+    document.querySelector('.container').classList.add('chat-active');
+    
+    // Clear existing messages
+    document.getElementById('messagesContainer').innerHTML = '';
+    
+    // Load message history FIRST (before subscribing to new messages)
+    await loadTeamHistory(team.id);
+    
+    // Subscribe to team messages for real-time updates
+    subscribeToTeam(team.id);
+    
+    // Load team members
+    await loadTeamMembers(team.id);
+    
+    // Notify server that user joined team
+    stompClient.send("/app/team.join", {}, JSON.stringify({
+        username: currentUser,
+        teamId: team.id
+    }));
+    
+    console.log('✅ Entered team successfully');
+}
+
+async function loadTeamHistory(teamId) {
+    try {
+        console.log('📜 Loading message history for team:', teamId);
+        
+        const response = await fetch(`http://localhost:8080/api/teams/${teamId}/messages?limit=100`);
+        const data = await response.json();
+        
+        if (response.ok && data.messages) {
+            console.log(`📜 Loaded ${data.messages.length} historical messages`);
+            
+            // Display messages in order (they come sorted from backend)
+            data.messages.forEach(message => {
+                displayMessage(message);
+            });
+        } else {
+            console.error('Failed to load message history:', data);
+        }
+    } catch (error) {
+        console.error('Error loading message history:', error);
+    }
+}
+
+function subscribeToTeam(teamId) {
+    // Unsubscribe from previous team if exists
+    if (currentSubscription) {
+        console.log('🔌 Unsubscribing from previous team');
+        currentSubscription.unsubscribe();
+        currentSubscription = null;
+    }
+    
+    // Subscribe to team messages
+    const messageDestination = `/user/queue/team/${teamId}/messages`;
+    console.log('📬 Subscribing to:', messageDestination);
+    
+    currentSubscription = stompClient.subscribe(messageDestination, function(message) {
+        console.log('📨 WebSocket message received!');
+        try {
+            const messageData = JSON.parse(message.body);
+            console.log('   📨 From:', messageData.sender);
+            console.log('   📨 Content:', messageData.content);
+            console.log('   📨 Timestamp:', messageData.timestamp);
+            displayMessage(messageData);
+        } catch (error) {
+            console.error('❌ Error parsing message:', error);
+        }
+    });
+    
+    console.log('✅ Subscribed to team messages:', messageDestination);
+    console.log('   Subscription ID:', currentSubscription.id);
+}
+
+async function loadTeamMembers(teamId) {
+    try {
+        const response = await fetch(`http://localhost:8080/api/teams/${teamId}/members`);
+        const data = await response.json();
+
+        if (response.ok) {
+            teamMembers = data.members;
+            displayTeamMembers(data.members);
+        }
+    } catch (error) {
+        console.error('Error loading team members:', error);
+    }
+}
+
+function displayTeamMembers(members) {
+    const container = document.getElementById('membersList');
+    const memberCount = document.getElementById('memberCount');
+    
+    memberCount.textContent = members.length;
+    container.innerHTML = '';
+    
+    members.forEach(member => {
+        const memberDiv = document.createElement('div');
+        memberDiv.className = 'member-item';
+        memberDiv.innerHTML = `
+            <div class="status-indicator ${member.online ? '' : 'offline'}"></div>
+            <div>${member.username}</div>
+        `;
+        container.appendChild(memberDiv);
+    });
+}
+
+function leaveTeam() {
+    if (!currentTeam) return;
+    
+    // Just go back to conversations instead of showing team selection
+    window.location.href = 'conversations.html';
+    return;
+    
+    // Notify server
+    if (stompClient && stompClient.connected) {
+        stompClient.send("/app/team.leave", {}, JSON.stringify({
+            username: currentUser,
+            teamId: currentTeam.id
+        }));
+    }
+    
+    // Clear UI
+    document.getElementById('messagesContainer').innerHTML = '';
+    currentTeam = null;
+    teamMembers = [];
+    
+    // Show team selection
+    document.getElementById('chatInterface').style.display = 'none';
+    document.getElementById('teamSelection').style.display = 'flex';
+    document.querySelector('.container').classList.remove('chat-active');
+    
+    // Reload teams
+    loadUserTeams();
+}
+
+// ============================================================================
+// MESSAGING
+// ============================================================================
+
+function sendMessage() {
+    const input = document.getElementById('messageInput');
+    const content = input.value.trim();
+    
+    if (!content || !currentTeam || !stompClient || !stompClient.connected) {
+        console.log('❌ Cannot send message:', {
+            hasContent: !!content,
+            hasTeam: !!currentTeam,
+            hasClient: !!stompClient,
+            isConnected: stompClient ? stompClient.connected : false
+        });
+        return;
+    }
+    
+    const message = {
+        sender: currentUser,
+        teamId: currentTeam.id,
+        content: content,
+        type: 'CHAT'
+    };
+    
+    console.log('📤 Sending message:', message);
+    stompClient.send("/app/team.send", {}, JSON.stringify(message));
+    console.log('✅ Message sent to server');
+    
+    input.value = '';
+    input.focus();
+}
+
+function handleKeyPress(event) {
+    if (event.key === 'Enter') {
+        sendMessage();
+    }
+}
+
+function displayMessage(message) {
+    const container = document.getElementById('messagesContainer');
+    const messageDiv = document.createElement('div');
+    
+    const isOwn = message.sender === currentUser;
+    const isSystem = message.type === 'JOIN' || message.type === 'LEAVE' || message.type === 'SYSTEM';
+    
+    if (isSystem) {
+        messageDiv.className = 'message system';
+        messageDiv.innerHTML = `
+            <div class="message-content">
+                <div class="message-bubble">${message.content}</div>
+            </div>
+        `;
+    } else {
+        messageDiv.className = `message ${isOwn ? 'own' : ''}`;
+        
+        const initials = message.sender.substring(0, 2).toUpperCase();
+        const time = formatTime(message.timestamp);
+        
+        messageDiv.innerHTML = `
+            <div class="message-avatar">${initials}</div>
+            <div class="message-content">
+                <div class="message-header">
+                    <span class="message-sender">${message.sender}</span>
+                    <span class="message-time">${time}</span>
+                </div>
+                <div class="message-bubble">${escapeHtml(message.content)}</div>
+            </div>
+        `;
+    }
+    
+    container.appendChild(messageDiv);
+    container.scrollTop = container.scrollHeight;
+}
+
+function formatTime(timestamp) {
+    if (!timestamp) return '';
+    
+    const date = new Date(timestamp);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ============================================================================
+// LOGOUT
+// ============================================================================
+
+function logoutFromTeamSelection() {
+    logout();
+}
+
+async function logout() {
+    try {
+        await fetch('http://localhost:8080/api/auth/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: currentUser })
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+    
+    if (stompClient && stompClient.connected) {
+        stompClient.disconnect();
+    }
+    
+    // Reset state
+    currentUser = null;
+    currentTeam = null;
+    teamMembers = [];
+    
+    // Clear session storage
+    sessionStorage.clear();
+    
+    // Redirect to login page
+    window.location.href = 'team-chat-client.html';
+    
+    // Clear forms
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+    clearAuthMessages();
+}
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('💬 Team Chat Client initialized');
+    
+    // Add Enter key support for login
+    document.getElementById('password').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') login();
+    });
+    
+    document.getElementById('regPassword').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') register();
+    });
+    
+    document.getElementById('createTeamName').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') createTeam();
+    });
+    
+    document.getElementById('joinTeamName').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') joinTeam();
+    });
+});

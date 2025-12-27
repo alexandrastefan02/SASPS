@@ -1,0 +1,21 @@
+# Scripts containing Azure credentials
+Untitled-1.ps1
+run-app.ps1
+
+# Maven build artifacts
+demo/target/
+demo-actor/target/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

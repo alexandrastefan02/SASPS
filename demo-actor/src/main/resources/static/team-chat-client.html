@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Chat Application</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #e8ddd9;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: transparent;
+            border-radius: 0;
+            box-shadow: none;
+            overflow: hidden;
+            height: 85vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .container.chat-active {
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        
+        /* Login Screen */
+        .login-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            flex-direction: column;
+            background: transparent;
+        }
+        
+        .login-form {
+            background: white;
+            padding: 50px;
+            border-radius: 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            min-width: 420px;
+            border-top: 3px solid #a8ab87;
+        }
+        
+        .login-form h2 {
+            text-align: center;
+            margin-bottom: 35px;
+            color: #2a2a28;
+            font-size: 24px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #6a6d55;
+            font-weight: 500;
+            font-size: 13px;
+            letter-spacing: 0.3px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #c8c8c4;
+            border-radius: 2px;
+            font-size: 14px;
+            transition: all 0.2s;
+            background: #fafaf9;
+        }
+        
+        .form-group input:focus {
+            border-color: #a8ab87;
+            outline: none;
+            background: white;
+            box-shadow: 0 0 0 2px rgba(168, 171, 135, 0.1);
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 2px;
+            font-size: 14px;
+            font-weight: 400;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 10px;
+            letter-spacing: 0.3px;
+        }
+        
+        .btn-primary {
+            background: #a8ab87;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #97987a;
+        }
+        
+        .btn-secondary {
+            background: #f5f5f3;
+            color: #4a4a48;
+            border: 1px solid #c8c8c4;
+        }
+        
+        .btn-secondary:hover {
+            background: #e8e8e5;
+        }
+        
+        .error {
+            color: #c44b3c;
+            margin-top: 15px;
+            text-align: center;
+            font-size: 13px;
+        }
+        
+        .success {
+            color: #6a8a5b;
+            margin-top: 15px;
+            text-align: center;
+            font-size: 13px;
+        }
+        
+        .toggle-link {
+            text-align: center;
+            margin-top: 15px;
+            color: #a8ab87;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        
+        .toggle-link:hover {
+            color: #8a8d6f;
+            text-decoration: underline;
+        }
+        
+        /* Team Selection Screen */
+        .team-selection {
+            display: none;
+            height: 100%;
+            flex-direction: column;
+            padding: 40px;
+            background: transparent;
+        }
+        
+        .team-selection h2 {
+            text-align: center;
+            margin-bottom: 35px;
+            color: #2a2a28;
+            font-size: 24px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        
+        .team-selection-content {
+            display: flex;
+            gap: 40px;
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        .team-section {
+            flex: 1;
+            background: white;
+            padding: 30px;
+            border-radius: 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border-top: 3px solid #a8ab87;
+        }
+        
+        .team-section h3 {
+            margin-bottom: 20px;
+            color: #a8ab87;
+            font-size: 18px;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+        }
+        
+        .team-input-group {
+            margin-bottom: 15px;
+        }
+        
+        .team-input-group input {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1px solid #c8c8c4;
+            border-radius: 2px;
+            font-size: 13px;
+            background: #fafaf9;
+            transition: all 0.2s;
+        }
+        
+        .team-input-group input:focus {
+            border-color: #a8ab87;
+            outline: none;
+            background: white;
+            box-shadow: 0 0 0 2px rgba(168, 171, 135, 0.1);
+        }
+        
+        .team-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .team-item {
+            padding: 15px;
+            border: 1px solid #d4d4d0;
+            border-radius: 0;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+        
+        .team-item:hover {
+            border-left-color: #997b7a;
+            background: #fafaf9;
+        }
+        
+        .team-item h4 {
+            margin-bottom: 5px;
+            color: #2a2a28;
+            font-weight: 500;
+        }
+        
+        .team-item p {
+            font-size: 12px;
+            color: #6a6a68;
+        }
+        
+        /* Chat Interface */
+        .chat-interface {
+            display: none;
+            height: 100%;
+            flex-direction: row;
+        }
+        
+        .team-sidebar {
+            width: 280px;
+            background: #2c3e50;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #34495e;
+        }
+        
+        .team-header {
+            padding: 20px;
+            background: #1a252f;
+            color: white;
+        }
+        
+        .team-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .user-info {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .logout-btn {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .members-section {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .members-title {
+            color: #95a5a6;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .member-item {
+            padding: 10px;
+            color: white;
+            border-radius: 6px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .member-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #2ecc71;
+        }
+        
+        .status-indicator.offline {
+            background: #95a5a6;
+        }
+        
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #ecf0f1;
+        }
+        
+        .chat-header {
+            padding: 20px;
+            background: white;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chat-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .connection-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .connection-status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .connection-status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .messages-container {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .message {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            max-width: 70%;
+        }
+        
+        .message.own {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        
+        .message-content {
+            flex: 1;
+        }
+        
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+        
+        .message-sender {
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .message-time {
+            font-size: 11px;
+            color: #999;
+        }
+        
+        .message-bubble {
+            padding: 12px 16px;
+            border-radius: 12px;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+        
+        .message:not(.own) .message-bubble {
+            background: white;
+            border: 1px solid #e0e0e0;
+            color: #333;
+        }
+        
+        .message.own .message-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .message.system {
+            align-self: center;
+            max-width: 100%;
+        }
+        
+        .message.system .message-bubble {
+            background: #f0f0f0;
+            color: #666;
+            font-size: 13px;
+            font-style: italic;
+            text-align: center;
+            padding: 8px 16px;
+        }
+        
+        .message-input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #ddd;
+            display: flex;
+            gap: 12px;
+        }
+        
+        .message-input {
+            flex: 1;
+            padding: 14px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        .message-input:focus {
+            border-color: #667eea;
+        }
+        
+        .send-btn {
+            padding: 14px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Login Screen -->
+        <div class="login-screen" id="loginScreen">
+            <div class="login-form">
+                <h2>TeamWork</h2>
+                <div id="loginFormContent">
+                    <div class="form-group">
+                        <label for="username">Username:</label>
+                        <input type="text" id="username" placeholder="Enter your username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password:</label>
+                        <input type="password" id="password" placeholder="Enter your password" required>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="login()">Login</button>
+                    <div class="toggle-link" onclick="showRegister()">Don't have an account? Register</div>
+                </div>
+                
+                <div id="registerFormContent" class="hidden">
+                    <div class="form-group">
+                        <label for="regUsername">Username:</label>
+                        <input type="text" id="regUsername" placeholder="Choose a username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="regPassword">Password:</label>
+                        <input type="password" id="regPassword" placeholder="Choose a password (min 3 chars)" required>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="register()">Create Account</button>
+                    <div class="toggle-link" onclick="showLogin()">Already have an account? Login</div>
+                </div>
+                
+                <div id="authError" class="error"></div>
+                <div id="authSuccess" class="success"></div>
+            </div>
+        </div>
+        
+        <!-- Team Selection Screen -->
+        <div class="team-selection" id="teamSelection">
+            <h2>Select or Create a Team</h2>
+            <div class="team-selection-content">
+                <!-- Join Existing Team -->
+                <div class="team-section">
+                    <h3>Join Existing Team</h3>
+                    <div class="team-input-group">
+                        <input type="text" id="joinTeamName" placeholder="Enter team name...">
+                    </div>
+                    <button class="btn btn-primary" onclick="joinTeam()">Join Team</button>
+                    
+                    <div style="margin-top: 30px;">
+                        <h4 style="color: #666; margin-bottom: 15px;">Your Teams:</h4>
+                        <div class="team-list" id="myTeamsList">
+                            <p style="color: #999; text-align: center;">No teams yet</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Create New Team -->
+                <div class="team-section">
+                    <h3>Create New Team</h3>
+                    <div class="team-input-group">
+                        <input type="text" id="createTeamName" placeholder="Enter team name...">
+                    </div>
+                    <button class="btn btn-primary" onclick="createTeam()">Create Team</button>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="logoutFromTeamSelection()" style="width: 200px;">Logout</button>
+            </div>
+            
+            <div id="teamError" class="error"></div>
+            <div id="teamSuccess" class="success"></div>
+        </div>
+        
+        <!-- Chat Interface -->
+        <div class="chat-interface" id="chatInterface">
+            <!-- Team Sidebar -->
+            <div class="team-sidebar">
+                <div class="team-header">
+                    <div class="team-name" id="currentTeamName">Team Name</div>
+                    <div class="user-info">Logged in as <span id="currentUsername">User</span></div>
+                    <button class="logout-btn" onclick="leaveTeam()">← Back to Conversations</button>
+                </div>
+                
+                <div class="members-section">
+                    <div class="members-title">Team Members (<span id="memberCount">0</span>)</div>
+                    <div id="membersList">
+                        <!-- Members will be populated here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Chat Main -->
+            <div class="chat-main">
+                <div class="chat-header">
+                    <div class="chat-title">TeamWork</div>
+                    <div class="connection-status" id="connectionStatus">Connecting...</div>
+                </div>
+                
+                <div class="messages-container" id="messagesContainer">
+                    <!-- Messages will appear here -->
+                </div>
+                
+                <div class="message-input-container">
+                    <input 
+                        type="text" 
+                        class="message-input" 
+                        id="messageInput" 
+                        placeholder="Type a message..."
+                        onkeypress="handleKeyPress(event)"
+                    >
+                    <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script src="team-chat-client.js"></script>
+</body>
+</html>
